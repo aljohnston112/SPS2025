@@ -27,7 +27,7 @@ int csv_reader_try_parse(CsvReader* reader) {
 
     while (currentCharacterPtr < reader->endPtr) {
         if (*currentCharacterPtr == '\r' || *currentCharacterPtr == '\n') {
-            cell->ptr = NULL;
+            cell->ptr = nullptr;
             cell->size = 0;
 
             reader->cursor.count++;
@@ -39,14 +39,14 @@ int csv_reader_try_parse(CsvReader* reader) {
 
         // TODO This should be a loop
         // It is a hard limit of 32 characters
-        const int rc = string_spanner_operator(
+        const size_t rc = string_spanner_operator(
             &reader->unquoted_cell_spanner,
             currentCharacterPtr
             );
         if (rc != 16) {
             currentCharacterPtr += rc;
         } else {
-            const int rc2 = string_spanner_operator(
+            const size_t rc2 = string_spanner_operator(
                 &reader->unquoted_cell_spanner,
                 currentCharacterPtr + 16
             );

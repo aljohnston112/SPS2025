@@ -1,8 +1,6 @@
 #ifndef CSVCURSOR_H
 #define CSVCURSOR_H
 
-#include <stddef.h>
-
 #include "CsvCell.h"
 
 typedef struct {
@@ -11,5 +9,6 @@ typedef struct {
 } CsvCursor;
 
 const CsvCell* csv_cursor_with_column_name(const CsvCursor* cursor, const char* value);
+
 
 #endif //CSVCURSOR_H

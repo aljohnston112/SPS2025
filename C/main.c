@@ -1,6 +1,8 @@
 #include <omp.h>
 #include <stdio.h>
 
+#include "file_util.h"
+
 int main(void)
 {
 #ifdef _OPENMP
@@ -8,6 +10,9 @@ int main(void)
 #else
     printf("OpenMP is not enabled.\n");
 #endif
-    return 0;
+
+    int resultCount;
+    StockDataResult* results = getAllStockData(&resultCount);
+    free(results);
     return 0;
 }

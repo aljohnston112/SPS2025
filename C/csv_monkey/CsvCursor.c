@@ -13,5 +13,5 @@ const CsvCell* csv_cursor_with_column_name(const CsvCursor* cursor, const char* 
             return cursor->cells[i];
         }
     }
-    return NULL;
+    return nullptr;
 }
