@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include "CSVCell.h"
+#include "CsvCell.h"
 
 #include <errno.h>
 #include <float.h>
@@ -12,7 +12,7 @@
  * @param self
  * @return A null-terminated string that must be deallocated when no longer needed.
  */
-char* CsvCell_as_str(const CsvCell* self) {
+char* csv_cell_as_str(const CsvCell* self) {
     // +1 for null
     char* str = malloc(self->size + 1);
     if (str == NULL) {
@@ -30,7 +30,7 @@ char* CsvCell_as_str(const CsvCell* self) {
  *        ERANGE if the integer was out of range
  *        EINVAL if no conversion was performed
  */
-int CsvCell_as_int(const CsvCell* self, int* out_value) {
+int csv_cell_as_int(const CsvCell* self, int* out_value) {
     char* endptr;
     const long value = strtol(self->ptr, &endptr, 10);
     if (errno != 0)
@@ -55,7 +55,7 @@ int CsvCell_as_int(const CsvCell* self, int* out_value) {
  *        ERANGE if the integer was out of range
  *        EINVAL if no conversion was performed
  */
-int CsvCell_as_double(const CsvCell* self, double* out_value) {
+int csv_cell_as_double(const CsvCell* self, double* out_value) {
     char* endptr;
     const double value = strtod(self->ptr, &endptr);
     if (errno != 0)
