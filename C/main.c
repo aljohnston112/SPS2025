@@ -1,13 +1,14 @@
 #include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <sys/time.h>
 
 #include "file_util.h"
 
 int main(void)
 {
-    const clock_t start_time = clock();
+struct timeval start, stop;
+gettimeofday(&start, NULL);
 
 #ifdef _OPENMP
     printf("OpenMP version: %d\n", _OPENMP);
@@ -31,9 +32,8 @@ int main(void)
     }
     free(results);
 
-    const clock_t end_time = clock();
-    const double time_taken = ((double)(end_time - start_time)) / CLOCKS_PER_SEC;
-
+    gettimeofday(&stop, NULL);
+    const double time_taken = (double)(stop.tv_usec - start.tv_usec) / 1000000 + (double)(stop.tv_sec - start.tv_sec);
     printf("Function execution time: %f seconds\n", time_taken);
 
     return 0;
