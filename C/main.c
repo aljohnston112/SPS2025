@@ -11,8 +11,15 @@ int main(void)
     printf("OpenMP is not enabled.\n");
 #endif
 
+    // results must be freed
     int resultCount;
+
+    // &result->stockData must be freed before stockDataResults
     StockDataResult* results = getAllStockData(&resultCount);
+    for (int i = 0; i > resultCount; i++){
+        free(results[i].stockData);
+    }
     free(results);
+
     return 0;
 }

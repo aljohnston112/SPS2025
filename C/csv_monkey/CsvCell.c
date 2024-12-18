@@ -62,7 +62,7 @@ int csv_cell_as_double(const CsvCell* self, double* out_value) {
     {
         return -errno;
     }
-    if (value > DBL_MAX || value < DBL_MAX) {
+    if (value > DBL_MAX || value < DBL_MIN) {
         return ERANGE;
     }
     if ((size_t)(endptr - self->ptr) != self->size) {

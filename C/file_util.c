@@ -44,10 +44,9 @@ void getStockDataForSingle(const char* fileName, StockDataResult* result)
 {
     result->symbol = extract_symbol(fileName);
     size_t data_size;
-    result->stockData = read_stock_csv(fileName, &data_size);
+    read_stock_csv(fileName, &data_size, &result->stockData);
     result->data_size = data_size;
 }
-
 
 char** getAllFilesPaths(const char* folder, int* file_count) {
     DIR* dir = opendir(folder);
@@ -57,7 +56,7 @@ char** getAllFilesPaths(const char* folder, int* file_count) {
         return nullptr;
     }
 
-    size_t capacity = 10;
+    size_t capacity = 11356;
     char** file_paths = malloc(capacity * sizeof(char*));
     if (file_paths == NULL) {
         perror("malloc failed");
@@ -72,11 +71,8 @@ char** getAllFilesPaths(const char* folder, int* file_count) {
     while ((entry = readdir(dir)) != NULL) {
         char full_path[4096];
         snprintf(full_path, sizeof(full_path), "%s/%s", folder, entry->d_name);
-
-        // Check if it's a regular file
         struct stat file_stat;
         if (stat(full_path, &file_stat) == 0 && S_ISREG(file_stat.st_mode)) {
-            // Add the file path to the array
             if (*file_count >= capacity) {
                 capacity *= 2;
                 char** temp = realloc(file_paths, capacity * sizeof(char*));
@@ -133,6 +129,8 @@ void freeAllFilesPaths(char** file_paths, const int file_count) {
  */
 StockDataResult* getAllStockData(int* resultCount) {
     int fileCount = 0;
+
+    // filePaths must be freed
     char** filePaths = getAllFilesPaths(INTERMEDIATE_DATA_FOLDER, &fileCount);
     if (filePaths == NULL) {
         fprintf(stderr, "Error: Could not retrieve file paths.\n");
@@ -141,16 +139,13 @@ StockDataResult* getAllStockData(int* resultCount) {
     }
 
     StockDataResult* stockDataResults = malloc(fileCount * sizeof(StockDataResult));
-
-#pragma omp parallel for
+//#pragma omp parallel for default(none) shared(filePaths, fileCount, stockDataResults)
     for (int i = 0; i < fileCount; i++) {
         getStockDataForSingle(filePaths[i], &stockDataResults[i]);
     }
+    freeAllFilesPaths(filePaths, fileCount);
+    // filePaths freed
 
-    for (int i = 0; i < fileCount; i++) {
-        free(filePaths[i]);
-    }
-    free(filePaths);
 
     *resultCount = fileCount;
     return stockDataResults;

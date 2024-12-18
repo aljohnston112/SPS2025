@@ -9,6 +9,5 @@ typedef union
     char* ints;
 } TwoDimensionalArrayElement;
 
-TwoDimensionalArrayElement* read_stock_csv(const char* filename, size_t* data_size);
-
+void read_stock_csv(const char* filename, size_t* data_size, TwoDimensionalArrayElement** data);
 #endif //CSV_UTIL_H

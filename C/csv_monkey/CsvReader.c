@@ -18,7 +18,7 @@ void csv_reader_init(CsvReader* reader, MappedFileCursor* stream, const char del
 
 int csv_reader_try_parse(CsvReader* reader) {
     char* currentCharacterPtr = reader->ptr;
-    CsvCell* cell = reader->cursor.cells[0];
+    CsvCell* cell = &reader->cursor.cells[0];
     reader->cursor.count = 0;
 
     while (*currentCharacterPtr == '\r' || *currentCharacterPtr == '\n') {
