@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.29)
-project(SPS2025 C)
+project(SPS2025 C CXX)
 
 set(CMAKE_C_STANDARD 23)
 find_package(OpenMP REQUIRED)
+
+set(CMAKE_C_COMPILER "gcc")
+set(CMAKE_CXX_COMPILER "g++")
 
 add_compile_options(
         -fopenmp
@@ -10,8 +13,17 @@ add_compile_options(
 )
 
 set(
-        SOURCE_FILES
-        C/csv_monkey/CsvCell.c
+        CXX_SOURCE_FILES
+        C/csv_monkey/CsvCell.cpp
+)
+
+set(
+        CXX_HEADER_FILES
+        C/csv_monkey/CsvCell.h
+)
+
+set(
+        C_SOURCE_FILES
         C/csv_monkey/CsvCursor.c
         C/csv_monkey/MappedFileCursor.c
         C/csv_monkey/CsvReader.c
@@ -21,8 +33,7 @@ set(
 )
 
 set(
-        HEADER_FILES
-        C/csv_monkey/CsvCell.h
+        C_HEADER_FILES
         C/csv_monkey/CsvCursor.h
         C/csv_monkey/MappedFileCursor.h
         C/csv_monkey/CsvReader.h
@@ -34,11 +45,12 @@ set(
 
 add_executable(
         SPS2025
-        ${SOURCE_FILES}
-        ${HEADER_FILES}
+        ${C_SOURCE_FILES}
+        ${CXX_SOURCE_FILES}
+        ${C_HEADER_FILES}
+        ${CXX_HEADER_FILES}
         C/main.c
 )
-
 if(OpenMP_C_FOUND)
     target_link_libraries(SPS2025 PRIVATE OpenMP::OpenMP_C)
 endif()

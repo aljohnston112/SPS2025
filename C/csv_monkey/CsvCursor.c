@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+
 /**
  * @param cursor A cursor pointing to the header row's start in a csv file.
  * @param value Header text to search for.

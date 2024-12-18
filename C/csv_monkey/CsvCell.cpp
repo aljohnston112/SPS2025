@@ -1,11 +1,12 @@
-#include <stdlib.h>
+#include <cstdlib>
 #include "CsvCell.h"
+#include <cerrno>
+#include <climits>
+#include <cstring>
+#include <charconv>
 
-#include <errno.h>
-#include <float.h>
-#include <limits.h>
-#include <string.h>
 
+extern "C" {
 /**
  * The caller is responsible for deallocating the returned string using `free()`.
  * errno may be set to ENOMEM if there is no memory left.
@@ -14,8 +15,8 @@
  */
 char* csv_cell_as_str(const CsvCell* self) {
     // +1 for null
-    char* str = malloc(self->size + 1);
-    if (str == NULL) {
+    const auto str = static_cast<char*>(malloc(self->size + 1));
+    if (str == nullptr) {
         return nullptr;
     }
     memcpy(str, self->ptr, self->size);
@@ -33,17 +34,16 @@ char* csv_cell_as_str(const CsvCell* self) {
 int csv_cell_as_int(const CsvCell* self, int* out_value) {
     char* endptr;
     const long value = strtol(self->ptr, &endptr, 10);
-    if (errno != 0)
-    {
+    if (errno != 0) {
         return -errno;
     }
     if (value > INT_MAX || value < INT_MIN) {
         return ERANGE;
     }
-    if ((size_t)(endptr - self->ptr) != self->size) {
+    if (static_cast<size_t>(endptr - self->ptr) != self->size) {
         return EINVAL;
     }
-    *out_value = (int)value;
+    *out_value = static_cast<int>(value);
     return errno;
 }
 
@@ -56,18 +56,11 @@ int csv_cell_as_int(const CsvCell* self, int* out_value) {
  *        EINVAL if no conversion was performed
  */
 int csv_cell_as_double(const CsvCell* self, double* out_value) {
-    char* endptr;
-    const double value = strtod(self->ptr, &endptr);
-    if (errno != 0)
-    {
-        return -errno;
-    }
-    if (value > DBL_MAX || value < DBL_MIN) {
-        return ERANGE;
-    }
-    if ((size_t)(endptr - self->ptr) != self->size) {
-        return EINVAL;
-    }
-    *out_value = (double)value;
-    return errno;
+    std::from_chars(
+        self->ptr,
+        self->ptr + self->size,
+        *out_value
+    );
+    return 0;
+}
 }
