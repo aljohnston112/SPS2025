@@ -13,4 +13,6 @@
 #define INTERMEDIATE_DATA_FOLDER "/home/main/CLionProjects/SPS2024/data/intermediate"
 #endif // _WIN32
 
+
+#define IS_PARALLEL 1
 #endif //CONFIG_H

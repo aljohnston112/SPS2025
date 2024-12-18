@@ -161,7 +161,7 @@ StockDataResult* getAllStockData(int* resultCount) {
     }
 
     StockDataResult* stockDataResults = malloc(fileCount * sizeof(StockDataResult));
-#pragma omp parallel for default(none) shared(filePaths, fileCount, stockDataResults)
+#pragma omp parallel for default(none) shared(filePaths, fileCount, stockDataResults) num_threads(180) proc_bind(close) if(IS_PARALLEL)
     for (int i = 0; i < fileCount; i++) {
         stockDataResults[i].stockData = malloc(7 * sizeof(TwoDimensionalArrayElement));
         for (int j = 0; j < 2; j++) {

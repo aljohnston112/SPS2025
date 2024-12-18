@@ -82,8 +82,6 @@ int mapped_file_cursor_map_file(MappedFileCursor* self, const char* filename) {
     }
 
     close(fd);
-    madvise(self->startPtr, st.st_size, MADV_SEQUENTIAL);
-    madvise(self->startPtr, st.st_size, MADV_WILLNEED);
 
     self->endPtr = self->startPtr + st.st_size;
     self->currentPtr = self->startPtr;
