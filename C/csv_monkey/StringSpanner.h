@@ -25,6 +25,6 @@ void string_spanner_init(
 );
 
 size_t string_spanner_operator(
-    StringSpanner* self,
+    const StringSpanner* self,
     const char* buf
 );
