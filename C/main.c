@@ -22,12 +22,6 @@ gettimeofday(&start, NULL);
     // &result->stockData must be freed before stockDataResults
     StockDataResult* results = getAllStockData(&resultCount);
     for (int i = 0; i > resultCount; i++){
-        for (int j = 0; j < 2; j++) {
-            free(results[i].stockData[j].ints);
-        }
-        for (int j = 2; j < 7; j++) {
-            free(results[i].stockData[j].doubles);
-        }
         free(results[i].stockData);
     }
     free(results);

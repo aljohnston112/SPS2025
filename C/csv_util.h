@@ -3,12 +3,18 @@
 
 #include <stddef.h>
 
-typedef union
+typedef struct
 {
-    double* doubles;
-    char* ints;
-} TwoDimensionalArrayElement;
+    char month;
+    char day;
+    double open;
+    double close;
+    double high;
+    double low;
+    double volume;
 
-void read_stock_csv(const char* filename, size_t* data_size, const TwoDimensionalArrayElement* data);
-void printData(const TwoDimensionalArrayElement* data, const size_t data_size);
+} Row;
+
+void read_stock_csv(const char* filename, size_t* data_size, Row* data);
+void printData(const Row* data, size_t data_size);
 #endif //CSV_UTIL_H

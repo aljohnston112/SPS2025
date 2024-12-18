@@ -6,27 +6,7 @@
 #include "csv_monkey/CsvReader.h"
 #include "csv_monkey/MappedFileCursor.h"
 
-void printData(const TwoDimensionalArrayElement* data, const size_t data_size) {
-    for (size_t i = 0; i < 7; i++) {
-        printf("Row %zu:\n", i);
-        const TwoDimensionalArrayElement element = data[i];
-        if (i < 2) {
-            printf("  ints: ");
-            for (size_t j = 0; j < data_size; j++) {
-                printf("%d ", element.ints[j]);
-            }
-            printf("\n");
-        } else {
-            printf("  doubles: ");
-            for (size_t j = 0; j < data_size; j++) {
-                printf("%.2f ", element.doubles[j]);
-            }
-            printf("\n");
-        }
-    }
-}
-
-void read_stock_csv(const char* filename, size_t* data_size, const TwoDimensionalArrayElement* data) {
+void read_stock_csv(const char* filename, size_t* data_size, Row* data) {
     MappedFileCursor file;
     mapped_file_cursor_map_file(&file, filename);
 
@@ -50,19 +30,19 @@ void read_stock_csv(const char* filename, size_t* data_size, const TwoDimensiona
         buffer[1] = date[5];
         buffer[2] = '\0';
         const long month = strtol(buffer, nullptr, 10);
-        data[0].ints[data_index] = (char)month;
+        data[data_index].month = (char)month;
 
         buffer[0] = date[6];
         buffer[1] = date[7];
         buffer[2] = '\0';
         const long day = strtol(buffer, nullptr, 10);
-        data[1].ints[data_index] = (char)day;
+        data[data_index].day = (char)day;
 
-        csv_cell_as_double(openCell, &data[2].doubles[data_index]);
-        csv_cell_as_double(highCell, &data[3].doubles[data_index]);
-        csv_cell_as_double(lowCell, &data[4].doubles[data_index]);
-        csv_cell_as_double(closeCell, &data[5].doubles[data_index]);
-        csv_cell_as_double(volumeCell, &data[6].doubles[data_index]);
+        csv_cell_as_double(openCell, &data[data_index].open);
+        csv_cell_as_double(highCell, &data[data_index].high);
+        csv_cell_as_double(lowCell, &data[data_index].low);
+        csv_cell_as_double(closeCell, &data[data_index].close);
+        csv_cell_as_double(volumeCell, &data[data_index].volume);
         data_index++;
     }
 

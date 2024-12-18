@@ -110,34 +110,6 @@ void freeAllFilesPaths(char** file_paths, const int file_count) {
     free(file_paths);
 }
 
-void printStockDataResults(const StockDataResult* stockDataResults, const size_t fileCount) {
-    for (size_t i = 0; i < fileCount; i++) {
-        const StockDataResult* result = &stockDataResults[i];
-
-        printf("Stock Symbol: %s\n", result->symbol);
-        printf("Data Size: %zu\n", result->data_size);
-
-        for (int j = 0; j < 7; j++) {
-            const TwoDimensionalArrayElement* element = (&result->stockData)[j];
-            printf("Stock Data Element %d:\n", j);
-
-            if (j < 2) {
-                printf("  ints: ");
-                for (size_t k = 0; k < result->data_size; k++) {
-                    printf("%d ", element->ints[k]);
-                }
-                printf("\n");
-            } else {
-                printf("  doubles: ");
-                for (size_t k = 0; k < result->data_size; k++) {
-                    printf("%.2f ", element->doubles[k]);
-                }
-                printf("\n");
-            }
-        }
-    }
-}
-
 /**
  * @return An array of stock data, where the stock data is an array of series
  *         where the indices map to the data being represented as follows.
@@ -163,30 +135,15 @@ StockDataResult* getAllStockData(int* resultCount) {
     StockDataResult* stockDataResults = malloc(fileCount * sizeof(StockDataResult));
 #pragma omp parallel for default(none) shared(filePaths, fileCount, stockDataResults) num_threads(180) proc_bind(close) if(IS_PARALLEL)
     for (int i = 0; i < fileCount; i++) {
-        stockDataResults[i].stockData = malloc(7 * sizeof(TwoDimensionalArrayElement));
-        for (int j = 0; j < 2; j++) {
-            // TwoDimensionalArrayElement* e = malloc(sizeof(TwoDimensionalArrayElement));
-            stockDataResults[i].stockData[j].ints = malloc(15844 * sizeof(char));
-            // stockDataResults[i].stockData[j] = *e;
-        }
-        for (int j = 2; j < 7; j++) {
-            TwoDimensionalArrayElement* e = malloc(sizeof(TwoDimensionalArrayElement));
-            // e->doubles = malloc(15844 * sizeof(double));
-            stockDataResults[i].stockData[j].doubles = malloc(15844 * sizeof(double));
-            // stockDataResults[i].stockData[j] = *e;
-        }
-
+        constexpr unsigned int LARGEST_STOCK_DATASET_SIZE = 15844;
+        stockDataResults[i].stockData = malloc(LARGEST_STOCK_DATASET_SIZE * sizeof(Row));
         getStockDataForSingle(filePaths[i], &stockDataResults[i]);
-
-        // printf("Stock %s:\n", stockDataResults[i].symbol);
-        // printData(stockDataResults[i].stockData, stockDataResults->data_size);
     }
     freeAllFilesPaths(filePaths, fileCount);
     // filePaths freed
 
     *resultCount = fileCount;
 
-    // printStockDataResults(stockDataResults, fileCount);
 
     return stockDataResults;
 }

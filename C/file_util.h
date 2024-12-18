@@ -12,7 +12,7 @@ typedef struct {
 
 typedef struct {
     char* symbol;
-    TwoDimensionalArrayElement* stockData;
+    Row* stockData;
     size_t data_size;
 } StockDataResult;
 
