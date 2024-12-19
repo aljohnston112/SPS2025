@@ -25,10 +25,9 @@ typedef struct {
 
 /**
  *
- * @param stockData The stock data whose records will be used to calculate the probability of a win.
- * @param stockDataSize The number of stocks whose data is in stockData.
- * @param directionData
- * @return The probability of a win.
+ * @param stockData The stock data to get the direction data of.
+ * @param stockDataSize The number of stocks in stockData.
+ * @param directionData The direction data .
  */
 void getDirectionData(const RawStockDataResults* stockData, const int stockDataSize, DirectionData* directionData) {
     if (stockData->data_size < 1) {
@@ -45,6 +44,7 @@ void getDirectionData(const RawStockDataResults* stockData, const int stockDataS
         double lastLow = stockData->stockData[0].low;
         double lastClose = stockData->stockData[0].close;
         double lastVolume = stockData->stockData[0].volume;
+
         for (int i = 1; i < stockData->data_size - 1; i++) {
             unsigned char record = 0;
             const char month = stockData->stockData[i].month;
@@ -86,7 +86,7 @@ void getDirectionData(const RawStockDataResults* stockData, const int stockDataS
             if (nextLow > lastHigh) {
                 record += (1 << WAS_PROFIT_POSITION);
             }
-            results[i] = record;
+            results[i - 1] = record;
 
             lastMonth = month;
             lastDay = day;
@@ -99,7 +99,7 @@ void getDirectionData(const RawStockDataResults* stockData, const int stockDataS
 
         directionData[j].stockSymbol = stockData[j].symbol;
         directionData[j].directionData = results;
-        directionData[j].dataSize = stockData[j].data_size - 1;
+        directionData[j].dataSize = stockData[j].data_size - 2;
     }
 }
 
