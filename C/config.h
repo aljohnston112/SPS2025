@@ -1,0 +1,8 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#define LARGEST_STOCK_DATASET_SIZE 15844
+#define NUMBER_OF_STOCK_EXAMPLES 11356
+#define IS_PARALLEL true
+
+#endif //CONFIG_H

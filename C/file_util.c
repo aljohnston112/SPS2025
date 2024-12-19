@@ -1,6 +1,7 @@
 #include "file_util.h"
 
 #include <dirent.h>
+#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,7 +9,7 @@
 
 #include "config.h"
 #include "csv_util.h"
-#include <omp.h>
+#include "internal_config.h"
 
 /**
  * Extracts the stock name from a file path.
@@ -24,12 +25,13 @@ char* extract_symbol(const char* path) {
         if (dotPosition != NULL) {
             const size_t length = dotPosition - lastSlashPosition;
             symbol = malloc(length + 1); // +1 for null-terminator
-            if (symbol != NULL) {
-                strncpy(symbol, lastSlashPosition, length);
-                symbol[length] = '\0';
+            if (symbol == NULL) {
+                perror("malloc failed");
+                return nullptr;
             }
-        }
-        else {
+            strncpy(symbol, lastSlashPosition, length);
+            symbol[length] = '\0';
+        } else {
             symbol = strdup(lastSlashPosition);
         }
     }
@@ -116,11 +118,9 @@ void loadRawStockData(
     const int fileCount,
     RawStockDataResults* rawStockDataResults
 ) {
-    #pragma omp parallel for default(none) shared(filePaths, fileCount, rawStockDataResults) num_threads(180) proc_bind(close) if(IS_PARALLEL)
+#pragma omp parallel for default(none) shared(filePaths, fileCount, rawStockDataResults) num_threads(180) proc_bind(close) if(IS_PARALLEL)
     for (int i = 0; i < fileCount; i++) {
-        constexpr unsigned int LARGEST_STOCK_DATASET_SIZE = 15844;
-        rawStockDataResults[i].stockData =
-            malloc(LARGEST_STOCK_DATASET_SIZE * sizeof(Row));
+        rawStockDataResults[i].stockData = malloc(LARGEST_STOCK_DATASET_SIZE * sizeof(Row));
         getStockDataFromSingleFile(filePaths[i], &rawStockDataResults[i]);
     }
 }
@@ -145,6 +145,10 @@ RawStockDataResults* loadAllStockDataFromDisk(int* resultCount) {
     }
 
     RawStockDataResults* rawStockDataResults = malloc(fileCount * sizeof(RawStockDataResults));
+    if (rawStockDataResults == NULL) {
+        perror("malloc failed");
+        return nullptr;
+    }
     loadRawStockData(filePaths, fileCount, rawStockDataResults);
     freeAllFilesPaths(filePaths, fileCount);
     // filePaths freed

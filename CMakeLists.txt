@@ -42,8 +42,9 @@ set(
         C/csv_lion/StringSpanner.h
         C/csv_util.h
         C/file_util.h
-        C/config.h
+        C/internal_config.h
         C/probability.h
+        C/config.h
 )
 
 add_executable(

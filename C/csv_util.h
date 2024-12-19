@@ -2,11 +2,12 @@
 #define CSV_UTIL_H
 
 #include <stddef.h>
+#include <sys/types.h>
 
 typedef struct
 {
-    char month;
-    char day;
+    u_int8_t month;
+    u_int8_t day;
     double open;
     double high;
     double low;
