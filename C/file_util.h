@@ -5,17 +5,18 @@
 #include "csv_util.h"
 
 typedef struct {
-    char** file_paths;
-    size_t file_count;
-    size_t capacity;
+  char** file_paths;
+  size_t file_count;
+  size_t capacity;
 } FileData;
 
 typedef struct {
-    char* symbol;
-    Row* stockData;
-    size_t data_size;
-} StockDataResult;
+  char* symbol;
+  Row* stockData;
+  size_t data_size;
+} RawStockDataResults;
 
-StockDataResult* getAllStockData(int* resultCount);
+RawStockDataResults* loadAllStockDataFromDisk(int* resultCount);
+void freeAllStockData(RawStockDataResults* results, int resultsCount);
 
-#endif //FILE_UTIL_H
+#endif // FILE_UTIL_H

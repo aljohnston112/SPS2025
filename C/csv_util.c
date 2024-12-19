@@ -1,10 +1,9 @@
 #include "csv_util.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 
-#include "csv_monkey/CsvReader.h"
-#include "csv_monkey/MappedFileCursor.h"
+#include "csv_lion/CsvReader.h"
+#include "csv_lion/MappedFileCursor.h"
 
 void read_stock_csv(const char* filename, size_t* data_size, Row* data) {
     MappedFileCursor file;

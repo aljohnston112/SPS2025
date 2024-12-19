@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.29)
 project(SPS2025 C CXX)
 
 set(CMAKE_C_STANDARD 23)
+set(CMAKE_CXX_STANDARD 20)
 find_package(OpenMP REQUIRED)
 
 set(CMAKE_C_COMPILER "gcc")
@@ -14,33 +15,35 @@ add_compile_options(
 
 set(
         CXX_SOURCE_FILES
-        C/csv_monkey/CsvCell.cpp
+        C/csv_lion/CsvCell.cpp
 )
 
 set(
         CXX_HEADER_FILES
-        C/csv_monkey/CsvCell.h
+        C/csv_lion/CsvCell.h
 )
 
 set(
         C_SOURCE_FILES
-        C/csv_monkey/CsvCursor.c
-        C/csv_monkey/MappedFileCursor.c
-        C/csv_monkey/CsvReader.c
-        C/csv_monkey/StringSpanner.c
+        C/csv_lion/CsvCursor.c
+        C/csv_lion/MappedFileCursor.c
+        C/csv_lion/CsvReader.c
+        C/csv_lion/StringSpanner.c
         C/csv_util.c
         C/file_util.c
+        C/probability.c
 )
 
 set(
         C_HEADER_FILES
-        C/csv_monkey/CsvCursor.h
-        C/csv_monkey/MappedFileCursor.h
-        C/csv_monkey/CsvReader.h
-        C/csv_monkey/StringSpanner.h
+        C/csv_lion/CsvCursor.h
+        C/csv_lion/MappedFileCursor.h
+        C/csv_lion/CsvReader.h
+        C/csv_lion/StringSpanner.h
         C/csv_util.h
         C/file_util.h
         C/config.h
+        C/probability.h
 )
 
 add_executable(
