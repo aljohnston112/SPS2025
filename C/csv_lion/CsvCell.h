@@ -1,10 +1,12 @@
 #ifndef CSVCELL_H
 #define CSVCELL_H
 
-#include <stdlib.h>
 
 #ifdef __cplusplus
+#include <cstddef>
 extern "C" {
+#else
+#include <stddef.h>
 #endif
 
 typedef struct CsvCell {
@@ -13,7 +15,6 @@ typedef struct CsvCell {
 } CsvCell;
 
 char* csv_cell_as_str(const CsvCell* self);
-int csv_cell_as_int(const CsvCell* self, int* out_value);
 int csv_cell_as_double(const CsvCell* self, double* out_value);
 
 #ifdef __cplusplus

@@ -16,3 +16,5 @@
 
 #define IS_PARALLEL 1
 #endif //CONFIG_H
+
+#define NUMBER_OF_STOCK_EXAMPLES 11356

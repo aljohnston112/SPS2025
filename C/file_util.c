@@ -1,13 +1,14 @@
+#include "file_util.h"
+
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "csv_util.h"
-#include "file_util.h"
-
 #include <sys/stat.h>
 
 #include "config.h"
+#include "csv_util.h"
+#include <omp.h>
 
 /**
  * Extracts the stock name from a file path.
@@ -27,18 +28,18 @@ char* extract_symbol(const char* path) {
                 strncpy(symbol, lastSlashPosition, length);
                 symbol[length] = '\0';
             }
-        } else {
+        }
+        else {
             symbol = strdup(lastSlashPosition);
         }
     }
     return symbol;
 }
 
-void getStockDataForSingle(const char* fileName, StockDataResult* result) {
+void getStockDataFromSingleFile(const char* fileName, RawStockDataResults* result) {
     result->symbol = extract_symbol(fileName);
     size_t data_size;
     read_stock_csv(fileName, &data_size, result->stockData);
-    // printData(result->stockData, data_size);
     result->data_size = data_size;
 }
 
@@ -50,7 +51,7 @@ char** getAllFilesPaths(const char* folder, int* file_count) {
         return nullptr;
     }
 
-    size_t capacity = 11356;
+    size_t capacity = NUMBER_OF_STOCK_EXAMPLES;
     char** file_paths = malloc(capacity * sizeof(char*));
     if (file_paths == NULL) {
         perror("malloc failed");
@@ -110,40 +111,51 @@ void freeAllFilesPaths(char** file_paths, const int file_count) {
     free(file_paths);
 }
 
+void loadRawStockData(
+    char** filePaths,
+    const int fileCount,
+    RawStockDataResults* rawStockDataResults
+) {
+    #pragma omp parallel for default(none) shared(filePaths, fileCount, rawStockDataResults) num_threads(180) proc_bind(close) if(IS_PARALLEL)
+    for (int i = 0; i < fileCount; i++) {
+        constexpr unsigned int LARGEST_STOCK_DATASET_SIZE = 15844;
+        rawStockDataResults[i].stockData =
+            malloc(LARGEST_STOCK_DATASET_SIZE * sizeof(Row));
+        getStockDataFromSingleFile(filePaths[i], &rawStockDataResults[i]);
+    }
+}
+
 /**
- * @return An array of stock data, where the stock data is an array of series
- *         where the indices map to the data being represented as follows.
- *         0 -> month
- *         1 -> day
- *         2 -> open
- *         3 -> high
- *         4 -> low
- *         5 -> close
- *         6 -> volume
+ * The caller is responsible for freeing.
+ * @param resultCount The number of rows in the returned raw stock data results.
+ * @return The results of loading the stock data from disk.
  */
-StockDataResult* getAllStockData(int* resultCount) {
+RawStockDataResults* loadAllStockDataFromDisk(int* resultCount) {
     int fileCount = 0;
 
     // filePaths must be freed
+    // -----------------------------------------------------------------------------------------
     char** filePaths = getAllFilesPaths(INTERMEDIATE_DATA_FOLDER, &fileCount);
+    *resultCount = fileCount;
+
     if (filePaths == NULL) {
         fprintf(stderr, "Error: Could not retrieve file paths.\n");
         *resultCount = 0;
         return nullptr;
     }
 
-    StockDataResult* stockDataResults = malloc(fileCount * sizeof(StockDataResult));
-#pragma omp parallel for default(none) shared(filePaths, fileCount, stockDataResults) num_threads(180) proc_bind(close) if(IS_PARALLEL)
-    for (int i = 0; i < fileCount; i++) {
-        constexpr unsigned int LARGEST_STOCK_DATASET_SIZE = 15844;
-        stockDataResults[i].stockData = malloc(LARGEST_STOCK_DATASET_SIZE * sizeof(Row));
-        getStockDataForSingle(filePaths[i], &stockDataResults[i]);
-    }
+    RawStockDataResults* rawStockDataResults = malloc(fileCount * sizeof(RawStockDataResults));
+    loadRawStockData(filePaths, fileCount, rawStockDataResults);
     freeAllFilesPaths(filePaths, fileCount);
     // filePaths freed
+    // -------------------------------------------------------------------------------------------------
 
-    *resultCount = fileCount;
+    return rawStockDataResults;
+}
 
-
-    return stockDataResults;
+void freeAllStockData(RawStockDataResults* results, const int resultsCount) {
+    for (int i = 0; i > resultsCount; i++) {
+        free(results[i].stockData);
+    }
+    free(results);
 }
