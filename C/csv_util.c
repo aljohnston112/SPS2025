@@ -1,11 +1,9 @@
 #include "csv_util.h"
 
-#include <stdlib.h>
-
 #include "csv_lion/CsvReader.h"
 #include "csv_lion/MappedFileCursor.h"
 
-void read_stock_csv(const char* filename, size_t* data_size, Row* data) {
+void read_stock_csv(const char* filename, RowArray* rows) {
     MappedFileCursor file_cursor;
     mapped_file_cursor_map_file(&file_cursor, filename);
 
@@ -20,24 +18,22 @@ void read_stock_csv(const char* filename, size_t* data_size, Row* data) {
     const CsvCell* closeCell = csv_cursor_with_column_name(row, "<CLOSE>");
     const CsvCell* volumeCell = csv_cursor_with_column_name(row, "<VOL>");
 
-    *data_size = 15844;
     size_t data_index = 0;
     while (csv_reader_read_row(&reader)) {
         const char* date = dateCell->ptr;
 
-        extract_uint8_t(date + 4, date + 6, &data[data_index].month);
-        extract_uint8_t(date + 6, date + 8, &data[data_index].day);
+        Row* current_row = &rows->rows[data_index];
+        extract_uint8_t(date + 4, date + 6, &current_row->month);
+        extract_uint8_t(date + 6, date + 8, &current_row->day);
 
-        csv_cell_as_double(openCell, &data[data_index].open);
-        csv_cell_as_double(highCell, &data[data_index].high);
-        csv_cell_as_double(lowCell, &data[data_index].low);
-        csv_cell_as_double(closeCell, &data[data_index].close);
-        csv_cell_as_double(volumeCell, &data[data_index].volume);
+        csv_cell_as_double(openCell, &current_row->open);
+        csv_cell_as_double(highCell, &current_row->high);
+        csv_cell_as_double(lowCell, &current_row->low);
+        csv_cell_as_double(closeCell, &current_row->close);
+        csv_cell_as_double(volumeCell, &current_row->volume);
         data_index++;
     }
 
     mapped_file_cursor_clean_up(&file_cursor);
-
-    *data_size = data_index;
-   // printData(data, data_index);
+    rows->data_size = data_index;
 }

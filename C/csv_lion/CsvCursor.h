@@ -8,7 +8,7 @@ typedef struct {
     CsvCell cells[32];
 } CsvCursor;
 
-const CsvCell* csv_cursor_with_column_name(const CsvCursor* cursor, const char* value);
+const CsvCell* csv_cursor_with_column_name(const CsvCursor* self, const char* value);
 
 
 #endif //CSVCURSOR_H

@@ -32,6 +32,7 @@ set(
         C/csv_util.c
         C/file_util.c
         C/probability.c
+        C/memory_util.c
 )
 
 set(
@@ -45,6 +46,7 @@ set(
         C/internal_config.h
         C/probability.h
         C/config.h
+        C/memory_util.h
 )
 
 add_executable(
