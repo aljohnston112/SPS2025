@@ -16,7 +16,7 @@ typedef struct {
 
 void csv_reader_init(
     CsvReader* reader,
-    MappedFileCursor* stream,
+    MappedFileCursor* file_cursor,
     char delimiter
 );
 int csv_reader_try_parse(CsvReader* reader);

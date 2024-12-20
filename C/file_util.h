@@ -2,6 +2,7 @@
 #define FILE_UTIL_H
 #include <stddef.h>
 
+#include "config.h"
 #include "csv_util.h"
 
 typedef struct {
@@ -12,8 +13,7 @@ typedef struct {
 
 typedef struct {
   char* symbol;
-  Row* stockData;
-  size_t data_size;
+  RowArray rows[LARGEST_STOCK_DATASET_SIZE];
 } RawStockDataResults;
 
 RawStockDataResults* loadAllStockDataFromDisk(int* resultCount);

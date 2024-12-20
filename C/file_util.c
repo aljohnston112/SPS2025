@@ -40,9 +40,7 @@ char* extract_symbol(const char* path) {
 
 void getStockDataFromSingleFile(const char* fileName, RawStockDataResults* result) {
     result->symbol = extract_symbol(fileName);
-    size_t data_size;
-    read_stock_csv(fileName, &data_size, result->stockData);
-    result->data_size = data_size;
+    read_stock_csv(fileName, result->rows);
 }
 
 char** getAllFilesPaths(const char* folder, int* file_count) {
@@ -120,7 +118,6 @@ void loadRawStockData(
 ) {
 #pragma omp parallel for default(none) shared(filePaths, fileCount, rawStockDataResults) num_threads(180) proc_bind(close) if(IS_PARALLEL)
     for (int i = 0; i < fileCount; i++) {
-        rawStockDataResults[i].stockData = malloc(LARGEST_STOCK_DATASET_SIZE * sizeof(Row));
         getStockDataFromSingleFile(filePaths[i], &rawStockDataResults[i]);
     }
 }
@@ -159,7 +156,7 @@ RawStockDataResults* loadAllStockDataFromDisk(int* resultCount) {
 
 void freeAllStockData(RawStockDataResults* results, const int resultsCount) {
     for (int i = 0; i > resultsCount; i++) {
-        free(results[i].stockData);
+        free(results[i].rows);
     }
     free(results);
 }

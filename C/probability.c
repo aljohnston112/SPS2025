@@ -13,8 +13,8 @@ void getDirectionData(
     DirectionData* allDirectionData
 ) {
     for (int j = 0; j < stockDataSize; j++) {
-        const RawStockDataResults* stock_data = &allStockData[j];
-        const Row* currentRow = &stock_data->stockData[0];
+        const RowArray* stock_data = allStockData[j].rows;
+        const Row* currentRow = &stock_data->rows[0];
         u_int8_t lastMonth = currentRow->month;
         u_int8_t lastDay = currentRow->day;
         double lastOpen = currentRow->open;
@@ -24,12 +24,13 @@ void getDirectionData(
         double lastVolume = currentRow->volume;
 
         DirectionData* direction_data = &allDirectionData[j];
+        direction_data->stockSymbol = allStockData[j].symbol;
         if (stock_data->data_size < 2) {
             direction_data->dataSize = 0;
         } else {
             for (int i = 1; i < stock_data->data_size - 1; i++) {
                 unsigned char record = 0;
-                currentRow = &stock_data->stockData[i];
+                currentRow = &stock_data->rows[i];
 
                 const u_int8_t month = currentRow->month;
                 const u_int8_t day = currentRow->day;
@@ -66,7 +67,7 @@ void getDirectionData(
                     record += (1 << VOLUME_POSITION);
                 }
 
-                const double nextLow = stock_data->stockData[i + 1].low;
+                const double nextLow = stock_data->rows[i + 1].low;
                 if (nextLow > lastHigh) {
                     record += (1 << WAS_PROFIT_POSITION);
                 }
@@ -82,7 +83,6 @@ void getDirectionData(
             }
             direction_data->dataSize = stock_data->data_size - 2;
         }
-        direction_data->stockSymbol = stock_data->symbol;
     }
 }
 
