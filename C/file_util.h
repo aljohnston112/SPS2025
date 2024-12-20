@@ -1,5 +1,6 @@
 #ifndef FILE_UTIL_H
 #define FILE_UTIL_H
+
 #include <stddef.h>
 
 #include "config.h"
@@ -8,15 +9,14 @@
 typedef struct {
   char** file_paths;
   size_t file_count;
-  size_t capacity;
 } FileData;
 
 typedef struct {
-  char* symbol;
-  RowArray rows[LARGEST_STOCK_DATASET_SIZE];
-} RawStockDataResults;
+  RowArray* row_arrays;
+  size_t number_of_raw_stock_data_arrays;
+} RawStockDataArray;
 
-RawStockDataResults* loadAllStockDataFromDisk(int* resultCount);
-void freeAllStockData(RawStockDataResults* results, int resultsCount);
+void loadAllStockDataFromDisk(RawStockDataArray* raw_stock_data_array);
+void freeAllStockData(const RawStockDataArray* raw_stock_data_array);
 
 #endif // FILE_UTIL_H

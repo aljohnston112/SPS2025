@@ -17,16 +17,33 @@ enum {
 };
 
 typedef struct {
-    char* stockSymbol;
-    u_int8_t* directionData;
-    size_t dataSize;
-} DirectionData;
+    char* stock_symbol;
+    u_int8_t* direction_data;
+    size_t data_size;
+} DirectionDataRowArray;
 
 typedef struct {
-    char* stockSymbol;
-    u_int8_t directionCounts[512];
+    DirectionDataRowArray* direction_data_arrays;
+    size_t data_size;
+} DirectionDataArray;
+
+typedef struct {
+    char* stock_symbol;
+    u_int8_t direction_counts[512];
 } DirectionCounts;
 
-void getDirectionData(const RawStockDataResults* allStockData, int stockDataSize, DirectionData* allDirectionData);
-void calculate_direction_counts(const DirectionData* all_direction_data, int results_count, DirectionCounts* all_direction_counts);
+typedef struct {
+    DirectionCounts* direction_counts;
+    size_t direction_size;
+} DirectionCountsArray;
+
+void getDirectionData(
+    const RawStockDataArray* all_stock_data,
+    const DirectionDataArray* all_direction_data
+);
+
+void calculate_direction_counts(
+    const DirectionDataArray* all_direction_data,
+    const DirectionCountsArray* all_direction_counts
+);
 #endif // PROBABILITY_H

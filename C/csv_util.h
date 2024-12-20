@@ -17,9 +17,11 @@ typedef struct {
 } Row;
 
 typedef struct RowArray {
-    Row rows[LARGEST_STOCK_DATASET_SIZE];
+    char* stock_symbol;
+    Row* rows;
     size_t data_size;
 } RowArray;
 
 void read_stock_csv(const char* filename, RowArray* rows);
+
 #endif //CSV_UTIL_H
