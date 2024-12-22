@@ -17,7 +17,7 @@ void printOpenMPVersion() {
 #endif
 }
 
-void performNaiveBayesOnEntireStockHistoryDirectionDits(
+void performNaiveBayesOnEntireStockHistoryDirectionBits(
     const DirectionDataArray* all_direction_data,
     const DirectionCountsArray* all_direction_counts
 ) {
@@ -108,7 +108,7 @@ void process(void) {
         return;
     }
 
-    performNaiveBayesOnEntireStockHistoryDirectionDits(&all_direction_data, &all_direction_counts);
+    performNaiveBayesOnEntireStockHistoryDirectionBits(&all_direction_data, &all_direction_counts);
 
     freeDirectionCounts(&all_direction_counts);
     freeDirectionData(&all_direction_data);
@@ -117,7 +117,7 @@ void process(void) {
 }
 
 int main() {
-    // printOpenMPVersion();
+    printOpenMPVersion();
 
     struct timeval start, stop;
     gettimeofday(&start, NULL);

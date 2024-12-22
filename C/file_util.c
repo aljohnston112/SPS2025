@@ -63,27 +63,11 @@ void getAllFilesPaths(const char* folder, FileData* file_data) {
     struct dirent* entry;
     file_data->file_count = 0;
 
-    while ((entry = readdir(dir)) != NULL) {
+    while ((entry = readdir(dir)) != NULL && file_data->file_count < capacity) {
         char full_path[4096];
         snprintf(full_path, sizeof(full_path), "%s/%s", folder, entry->d_name);
         struct stat file_stat;
         if (stat(full_path, &file_stat) == 0 && S_ISREG(file_stat.st_mode)) {
-            if (file_data->file_count >= capacity) {
-                capacity *= 2;
-                char** temp = realloc(file_data->file_paths, capacity * sizeof(char*));
-                if (temp == NULL) {
-                    perror("realloc failed");
-                    for (int i = 0; i < file_data->file_count; i++) {
-                        free(file_data->file_paths[i]);
-                    }
-                    free(file_data->file_paths);
-                    closedir(dir);
-                    file_data->file_count = 0;
-                    return;
-                }
-                file_data->file_paths = temp;
-            }
-
             file_data->file_paths[file_data->file_count] = strdup(full_path);
             if (file_data->file_paths[file_data->file_count] == NULL) {
                 perror("strdup failed");
@@ -95,8 +79,7 @@ void getAllFilesPaths(const char* folder, FileData* file_data) {
                 file_data->file_count = 0;
                 return;
             }
-
-            (file_data->file_count)++;
+            ++file_data->file_count;
         }
     }
     closedir(dir);

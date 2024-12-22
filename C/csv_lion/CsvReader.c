@@ -12,7 +12,6 @@ void csv_reader_init(CsvReader* reader, MappedFileCursor* file_cursor, const cha
     reader->endPtr = reader->ptr + mapped_file_cursor_size(file_cursor);
     reader->delimiter = delimiter;
     reader->stream = file_cursor;
-    reader->cursor;
     string_spanner_init(&reader->unquoted_cell_spanner, delimiter, '\r', '\n', 0);
 }
 

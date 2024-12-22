@@ -2,11 +2,21 @@ cmake_minimum_required(VERSION 3.29)
 project(SPS2025 C CXX)
 
 set(CMAKE_C_STANDARD 23)
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 find_package(OpenMP REQUIRED)
 
-set(CMAKE_C_COMPILER "gcc")
-set(CMAKE_CXX_COMPILER "g++")
+set(USE_GCC TRUE)
+
+if (USE_GCC)
+    set(CMAKE_C_COMPILER "gcc")
+    set(CMAKE_CXX_COMPILER "g++")
+else ()
+    set(CMAKE_C_COMPILER "clang")
+    set(CMAKE_CXX_COMPILER "clang++")
+    add_link_options(
+            -fopenmp=libomp
+    )
+endif ()
 
 add_compile_options(
         -fopenmp
@@ -49,12 +59,11 @@ set(
 
 add_executable(
         SPS2025
-        ${C_SOURCE_FILES}
-        ${CXX_SOURCE_FILES}
         ${C_HEADER_FILES}
         ${CXX_HEADER_FILES}
+        ${C_SOURCE_FILES}
+        ${CXX_SOURCE_FILES}
         C/main.c
 )
-if(OpenMP_C_FOUND)
-    target_link_libraries(SPS2025 PRIVATE OpenMP::OpenMP_C)
-endif()
+
+target_link_libraries(SPS2025 PRIVATE m OpenMP::OpenMP_C)

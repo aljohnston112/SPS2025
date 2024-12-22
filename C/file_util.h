@@ -1,9 +1,6 @@
 #ifndef FILE_UTIL_H
 #define FILE_UTIL_H
 
-#include <stddef.h>
-
-#include "config.h"
 #include "csv_util.h"
 
 typedef struct {
