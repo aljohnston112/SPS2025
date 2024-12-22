@@ -29,21 +29,26 @@ typedef struct {
 
 typedef struct {
     char* stock_symbol;
-    u_int8_t direction_counts[512];
+    double direction_counts[512];
 } DirectionCounts;
 
 typedef struct {
     DirectionCounts* direction_counts;
-    size_t direction_size;
+    size_t data_size;
 } DirectionCountsArray;
 
-void getDirectionData(
+bool getDirectionData(
     const RawStockDataArray* all_stock_data,
-    const DirectionDataArray* all_direction_data
+    DirectionDataArray* all_direction_data
 );
 
-void calculate_direction_counts(
+bool calculateDirectionCounts(
     const DirectionDataArray* all_direction_data,
-    const DirectionCountsArray* all_direction_counts
+    DirectionCountsArray* all_direction_counts
 );
+
+void freeDirectionData(const DirectionDataArray* all_direction_data);
+
+void freeDirectionCounts(const DirectionCountsArray* all_direction_counts);
+
 #endif // PROBABILITY_H

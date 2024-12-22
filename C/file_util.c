@@ -38,9 +38,9 @@ char* extract_symbol(const char* path) {
     return symbol;
 }
 
-void getStockDataFromSingleFile(const char* fileName, RowArray* row_array) {
-    row_array->stock_symbol = extract_symbol(fileName);
-    read_stock_csv(fileName, row_array);
+void getStockDataFromSingleFile(const char* file_name, RowArray* row_array) {
+    row_array->stock_symbol = extract_symbol(file_name);
+    read_stock_csv(file_name, row_array);
 }
 
 void getAllFilesPaths(const char* folder, FileData* file_data) {
@@ -126,7 +126,7 @@ void loadRawStockData(
  * The caller is responsible for freeing the returned stock data via freeAllStockData.
  * @return The results of loading the stock data from disk.
  */
-void loadAllStockDataFromDisk(RawStockDataArray* raw_stock_data_array) {
+bool loadAllStockDataFromDisk(RawStockDataArray* raw_stock_data_array) {
 
     // filePaths must be freed
     // -----------------------------------------------------------------------------------------
@@ -134,13 +134,14 @@ void loadAllStockDataFromDisk(RawStockDataArray* raw_stock_data_array) {
     getAllFilesPaths(INTERMEDIATE_DATA_FOLDER, &file_data);
     if (file_data.file_paths == NULL) {
         fprintf(stderr, "Error: Could not retrieve file paths.\n");
-        return;
+        return false;
     }
 
     raw_stock_data_array->row_arrays = malloc(file_data.file_count * sizeof(RowArray));
     if (raw_stock_data_array->row_arrays == NULL) {
+        freeAllFilesPaths(&file_data);
         perror("malloc failed");
-        return;
+        return false;
     }
     raw_stock_data_array->number_of_raw_stock_data_arrays = file_data.file_count;
 
@@ -155,7 +156,7 @@ void loadAllStockDataFromDisk(RawStockDataArray* raw_stock_data_array) {
             free(raw_stock_data_array->row_arrays);
             freeAllFilesPaths(&file_data);
             perror("malloc failed");
-            return;
+            return false;
         }
     }
 
@@ -163,6 +164,7 @@ void loadAllStockDataFromDisk(RawStockDataArray* raw_stock_data_array) {
     freeAllFilesPaths(&file_data);
     // filePaths freed
     // -------------------------------------------------------------------------------------------------
+    return true;
 }
 
 void freeAllStockData(const RawStockDataArray* raw_stock_data_array) {
