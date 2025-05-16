@@ -1,2 +1,6 @@
-Try AVX-512 to read the csvs faster
-Write a custom double parser using SIMD.
+Cython interface
+Sampling. What type?
+
+Low Priority:
+    Try AVX-512 to read the csvs faster
+    Write a custom double parser using SIMD.

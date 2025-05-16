@@ -109,7 +109,7 @@ void loadRawStockData(
  * The caller is responsible for freeing the returned stock data via freeAllStockData.
  * @return The results of loading the stock data from disk.
  */
-bool loadAllStockDataFromDisk(RawStockDataArray* raw_stock_data_array) {
+bool loadAllStockDataFromDisk(RawStockDataArray** raw_stock_data_array) {
 
     // filePaths must be freed
     // -----------------------------------------------------------------------------------------
@@ -120,30 +120,31 @@ bool loadAllStockDataFromDisk(RawStockDataArray* raw_stock_data_array) {
         return false;
     }
 
-    raw_stock_data_array->row_arrays = malloc(file_data.file_count * sizeof(RowArray));
-    if (raw_stock_data_array->row_arrays == NULL) {
+    (*raw_stock_data_array) = malloc(sizeof(RawStockDataArray));
+    (*raw_stock_data_array)->row_arrays = malloc(file_data.file_count * sizeof(RowArray));
+    if ((*raw_stock_data_array)->row_arrays == NULL) {
         freeAllFilesPaths(&file_data);
         perror("malloc failed");
         return false;
     }
-    raw_stock_data_array->number_of_raw_stock_data_arrays = file_data.file_count;
+    (*raw_stock_data_array)->number_of_raw_stock_data_arrays = file_data.file_count;
 
     for (int i = 0; i < file_data.file_count; i++) {
-        RowArray* current_row = &raw_stock_data_array->row_arrays[i];
+        RowArray* current_row = &(*raw_stock_data_array)->row_arrays[i];
         current_row->rows = malloc(LARGEST_STOCK_DATASET_SIZE * sizeof(Row));
         current_row->data_size = LARGEST_STOCK_DATASET_SIZE;
-        if (raw_stock_data_array->row_arrays[i].rows == NULL) {
+        if ((*raw_stock_data_array)->row_arrays[i].rows == NULL) {
             for (int j = 0; j < i; j++) {
-                free(raw_stock_data_array->row_arrays[j].rows);
+                free((*raw_stock_data_array)->row_arrays[j].rows);
             }
-            free(raw_stock_data_array->row_arrays);
+            free((*raw_stock_data_array)->row_arrays);
             freeAllFilesPaths(&file_data);
             perror("malloc failed");
             return false;
         }
     }
 
-    loadRawStockData(&file_data, raw_stock_data_array);
+    loadRawStockData(&file_data, *raw_stock_data_array);
     freeAllFilesPaths(&file_data);
     // filePaths freed
     // -------------------------------------------------------------------------------------------------

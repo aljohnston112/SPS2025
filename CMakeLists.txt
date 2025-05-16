@@ -5,8 +5,14 @@ set(CMAKE_C_STANDARD 23)
 set(CMAKE_CXX_STANDARD 17)
 find_package(OpenMP REQUIRED)
 
-set(USE_GCC TRUE)
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development NumPy)
+include_directories(
+        external/matplotlib-cpp
+        ${Python3_INCLUDE_DIRS}
+        ${Python3_NumPy_INCLUDE_DIRS}
+)
 
+set(USE_GCC TRUE)
 if (USE_GCC)
     set(CMAKE_C_COMPILER "gcc")
     set(CMAKE_CXX_COMPILER "g++")
@@ -42,6 +48,7 @@ set(
         C/csv_util.c
         C/file_util.c
         C/directions.c
+        C/tree.c
 )
 
 set(
@@ -55,6 +62,7 @@ set(
         C/internal_config.h
         C/directions.h
         C/config.h
+        C/tree.h
 )
 
 add_executable(
@@ -66,4 +74,13 @@ add_executable(
         C/main.c
 )
 
-target_link_libraries(SPS2025 PRIVATE m OpenMP::OpenMP_C)
+add_library(
+        array_to_python SHARED
+        C/array_to_python.c
+        ${C_HEADER_FILES}
+        ${CXX_HEADER_FILES}
+        ${C_SOURCE_FILES}
+        ${CXX_SOURCE_FILES})
+set_target_properties(array_to_python PROPERTIES LINKER_LANGUAGE C)
+target_link_libraries(SPS2025 PRIVATE m OpenMP::OpenMP_C ${Python3_LIBRARIES})
+

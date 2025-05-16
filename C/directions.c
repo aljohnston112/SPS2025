@@ -3,15 +3,18 @@
 #include <float.h>
 #include <stdio.h>
 
+#include "config.h"
 #include "file_util.h"
 
 bool allocateDirectionDataArray(
     const RawStockDataArray* raw_stock_data_array,
     DirectionDataArray* all_direction_data
 ) {
-    const size_t number_of_stocks = raw_stock_data_array->number_of_raw_stock_data_arrays;
+    const size_t number_of_stocks = raw_stock_data_array->
+        number_of_raw_stock_data_arrays;
     all_direction_data->data_size = number_of_stocks;
-    all_direction_data->direction_data_arrays = malloc(number_of_stocks * sizeof(DirectionDataRowArray));
+    all_direction_data->direction_data_arrays = malloc(
+        number_of_stocks * sizeof(DirectionDataRowArray));
     if (all_direction_data->direction_data_arrays == NULL) {
         freeAllStockData(raw_stock_data_array);
         perror("malloc failed");
@@ -19,22 +22,26 @@ bool allocateDirectionDataArray(
     }
 
     for (int i = 0; i < number_of_stocks; i++) {
-        const RowArray* raw_stock_data_row_array = &raw_stock_data_array->row_arrays[i];
+        const RowArray* raw_stock_data_row_array = &raw_stock_data_array->
+            row_arrays[i];
         size_t direction_data_size = raw_stock_data_row_array->data_size - 2;
         if (raw_stock_data_row_array->data_size < 3) {
             direction_data_size = 0;
         }
 
-        DirectionDataRowArray* direction_data_row_array = &all_direction_data->direction_data_arrays[i];
+        DirectionDataRowArray* direction_data_row_array = &all_direction_data->
+            direction_data_arrays[i];
         direction_data_row_array->direction_data = malloc(
             direction_data_size * sizeof(u_int8_t)
         );
         direction_data_row_array->data_size = direction_data_size;
-        direction_data_row_array->stock_symbol = raw_stock_data_row_array->stock_symbol;
+        direction_data_row_array->stock_symbol = raw_stock_data_row_array->
+            stock_symbol;
 
         if (direction_data_row_array->direction_data == NULL) {
             for (int j = 0; j < i; j++) {
-                free(all_direction_data->direction_data_arrays[j].direction_data);
+                free(all_direction_data->direction_data_arrays[j].
+                    direction_data);
             }
             free(all_direction_data->direction_data_arrays);
             freeAllStockData(raw_stock_data_array);
@@ -45,8 +52,12 @@ bool allocateDirectionDataArray(
     return true;
 }
 
-void getDirectionDataForSingle(const RawStockDataArray* all_stock_data, DirectionDataArray* all_direction_data, int i) {
-    const RowArray* stock_data = &all_stock_data->row_arrays[i];
+void getDirectionDataForSingle(
+    const RawStockDataArray* all_stock_data,
+    const DirectionDataArray* all_direction_data,
+    const int stock_index
+) {
+    const RowArray* stock_data = &all_stock_data->row_arrays[stock_index];
     const Row* currentRow = &stock_data->rows[0];
 
     u_int8_t lastMonth = currentRow->month;
@@ -57,7 +68,8 @@ void getDirectionDataForSingle(const RawStockDataArray* all_stock_data, Directio
     double lastClose = currentRow->close;
     double lastVolume = currentRow->volume;
 
-    const DirectionDataRowArray* direction_data = &all_direction_data->direction_data_arrays[i];
+    const DirectionDataRowArray* direction_data = &all_direction_data->
+        direction_data_arrays[stock_index];
     if (direction_data->data_size > 0) {
         for (int i = 1; i < stock_data->data_size - 1; i++) {
             unsigned char record = 0;
@@ -98,7 +110,7 @@ void getDirectionDataForSingle(const RawStockDataArray* all_stock_data, Directio
                 record += (1 << VOLUME_POSITION);
             }
 
-            const double nextLow = stock_data->rows[i + 1].low;
+            const double nextLow = stock_data->rows[i + 2].low;
             if (nextLow > lastHigh) {
                 record += (1 << WAS_PROFIT_POSITION);
             }
@@ -120,16 +132,19 @@ void getDirectionDataForSingle(const RawStockDataArray* all_stock_data, Directio
  * @param all_direction_data The direction data.
  */
 bool getDirectionData(
-    const RawStockDataArray* all_stock_data,
-    DirectionDataArray* all_direction_data
+    RawStockDataArray** all_stock_data,
+    DirectionDataArray** all_direction_data
 ) {
-    const bool success = allocateDirectionDataArray(all_stock_data, all_direction_data);
+    (*all_direction_data) = malloc(sizeof(DirectionDataArray));
+    const bool success = allocateDirectionDataArray(
+        *all_stock_data, *all_direction_data);
     if (!success) {
         return false;
     }
 #pragma omp parallel for default(none) shared(all_stock_data, all_direction_data) num_threads(180) proc_bind(close) if(IS_PARALLEL)
-    for (int i = 0; i < all_stock_data->number_of_raw_stock_data_arrays; i++) {
-        getDirectionDataForSingle(all_stock_data, all_direction_data, i);
+    for (int i = 0; i < (*all_stock_data)->number_of_raw_stock_data_arrays; i
+         ++) {
+        getDirectionDataForSingle(*all_stock_data, *all_direction_data, i);
     }
     return true;
 }
@@ -139,7 +154,8 @@ bool allocateDirectionCountArrays(
     DirectionCountsArray* all_direction_counts
 ) {
     const size_t number_of_stocks = all_direction_data->data_size;
-    all_direction_counts->direction_counts = malloc(number_of_stocks * sizeof(DirectionCounts));
+    all_direction_counts->direction_counts = malloc(
+        number_of_stocks * sizeof(DirectionCounts));
     all_direction_counts->data_size = number_of_stocks;
     if (all_direction_counts->direction_counts == NULL) {
         for (int j = 0; j < all_direction_data->data_size; j++) {
@@ -156,17 +172,119 @@ bool allocateDirectionCountArrays(
     return true;
 }
 
-bool calculateDirectionCounts(
-    const DirectionDataArray* all_direction_data,
-    DirectionCountsArray* all_direction_counts
+bool allocateDirectionStreakArray(
+    const DirectionDataArray* direction_data_array,
+    DirectionStreakArray* direction_streaks_array
 ) {
-    const bool success = allocateDirectionCountArrays(all_direction_data, all_direction_counts);
+    const size_t number_of_stocks = direction_data_array->data_size;
+    direction_streaks_array->data_size = number_of_stocks;
+    direction_streaks_array->direction_streaks_arrays = malloc(
+        number_of_stocks * sizeof(DirectionStreakRowArray));
+    if (direction_streaks_array->direction_streaks_arrays == NULL) {
+        freeDirectionData(direction_data_array);
+        perror("malloc failed");
+        return false;
+    }
+
+    for (int i = 0; i < number_of_stocks; i++) {
+        const DirectionDataRowArray* direction_data_row_array =
+            &direction_data_array->direction_data_arrays[i];
+        size_t direction_streak_size = direction_data_row_array->data_size - 2;
+        if (direction_data_row_array->data_size < 3) {
+            direction_streak_size = 0;
+        }
+
+        DirectionStreakRowArray* direction_streak_row_array = &
+            direction_streaks_array->direction_streaks_arrays[i];
+        direction_streak_row_array->direction_streaks = malloc(
+            direction_streak_size * sizeof(long)
+        );
+        direction_streak_row_array->data_size = direction_streak_size;
+        direction_streak_row_array->stock_symbol = direction_data_row_array->
+            stock_symbol;
+
+        if (direction_streak_row_array->direction_streaks == NULL) {
+            for (int j = 0; j < i; j++) {
+                free(direction_streaks_array->direction_streaks_arrays[j].
+                    direction_streaks);
+            }
+            free(direction_streaks_array->direction_streaks_arrays);
+            freeDirectionData(direction_data_array);
+            perror("malloc failed");
+            return false;
+        }
+    }
+    return true;
+}
+
+
+void getDirectionStreaksForSingle(
+    const DirectionDataArray* all_direction_data,
+    const DirectionStreakArray* all_direction_streaks,
+    const int i
+) {
+    const DirectionDataRowArray direction_data =
+        all_direction_data->direction_data_arrays[i];
+    DirectionStreakRowArray* direction_streaks =
+        &all_direction_streaks->direction_streaks_arrays[i];
+    bool was_profit = true;
+    long current_streak = 0;
+    u_long current_streak_index = 0;
+    for (int j = 0; j < direction_data.data_size; j++) {
+        const u_int8_t c = direction_data.direction_data[j];
+        const bool is_profit = c & PROFIT_EXTRACTION_BITMASK;
+        if (is_profit == was_profit) {
+            current_streak++;
+        } else {
+            if (was_profit) {
+                direction_streaks->direction_streaks[current_streak_index] = current_streak;
+            } else {
+                direction_streaks->direction_streaks[current_streak_index] = -current_streak;
+            }
+            current_streak_index++;
+            current_streak = 1;
+            was_profit = is_profit;
+        }
+    }
+    direction_streaks->data_size = current_streak_index;
+}
+
+bool getDirectionStreaks(
+    DirectionDataArray** all_direction_data,
+    DirectionStreakArray** all_direction_streaks
+) {
+    (*all_direction_streaks) = malloc(sizeof(DirectionStreakArray));
+    const bool success = allocateDirectionStreakArray(
+        *all_direction_data, *all_direction_streaks);
     if (!success) {
         return false;
     }
-    for (int i = 0; i < all_direction_data->data_size; i++) {
-        const DirectionDataRowArray* direction_data = &all_direction_data->direction_data_arrays[i];
-        DirectionCounts* direction_counts = &all_direction_counts->direction_counts[i];
+#pragma omp parallel for default(none) shared(all_direction_data, all_direction_streaks) num_threads(180) proc_bind(close) if(IS_PARALLEL)
+    for (int i = 0; i < (*all_direction_data)->data_size; i++) {
+        getDirectionStreaksForSingle(
+            *all_direction_data,
+            *all_direction_streaks,
+            i
+        );
+    }
+    return true;
+}
+
+bool calculateDirectionCounts(
+    DirectionDataArray** all_direction_data,
+    DirectionCountsArray** all_direction_counts
+) {
+    (*all_direction_counts) = malloc(sizeof(DirectionCounts));
+    const bool success = allocateDirectionCountArrays(
+        *all_direction_data, *all_direction_counts);
+    if (!success) {
+        return false;
+    }
+    for (int i = 0; i < (*all_direction_data)->data_size; i++) {
+        const DirectionDataRowArray* direction_data = &(*all_direction_data)->
+            direction_data_arrays[i];
+        DirectionCounts* direction_counts = &(*all_direction_counts)->
+            direction_counts[i];
         double* counts = direction_counts->direction_counts;
         for (int j = 0; j < 512; j++) {
             counts[j] = 0;

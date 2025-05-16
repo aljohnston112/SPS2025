@@ -4,8 +4,6 @@
 #include <stddef.h>
 #include <sys/types.h>
 
-#include "config.h"
-
 typedef struct {
     u_int8_t month;
     u_int8_t day;
