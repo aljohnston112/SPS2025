@@ -119,19 +119,16 @@ void process(void) {
         return;
     }
 
-    TreeNode* tree = create_node(false);
+    TreeNode* tree = create_tree_node();
     for (int i = 0; i < direction_streak_array->data_size; i++) {
         const DirectionStreakRowArray* direction_streak_row_array =
             &direction_streak_array->direction_streaks_arrays[i];
         const long* data = direction_streak_row_array->direction_streaks;
         const u_long data_size = direction_streak_row_array->data_size;
-        add_sequence(tree, data, data_size);
+        add_sequence(tree, data, 500);
     }
 
-    ulong total_count = 0;
-    ulong count = count_empty_slots(tree, &total_count);
-    printf("Empty slot ratio: %f\n", (double)count / (double)total_count);
-    // print_tree(tree);
+    print_tree(tree);
 
     // long max = 0;
     // long min = 0;
