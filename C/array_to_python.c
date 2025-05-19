@@ -3,7 +3,7 @@
 StockDataArray* load_stock_data() {
 
     RawStockDataArray* raw_stock_data_array;
-    bool success = loadAllStockDataFromDisk(&raw_stock_data_array);
+    bool success = load_all_stock_data_from_disk(&raw_stock_data_array);
     if (!success) {
         return nullptr;
     }

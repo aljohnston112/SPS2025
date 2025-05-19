@@ -66,8 +66,10 @@ bool getDirectionStreaks(
     DirectionStreakArray** all_direction_streaks
 );
 
-void freeDirectionData(const DirectionDataArray* all_direction_data);
+void freeDirectionData(DirectionDataArray* all_direction_data);
 
-void freeDirectionCounts(const DirectionCountsArray* all_direction_counts);
+void freeDirectionCounts(DirectionCountsArray* all_direction_counts);
+
+void free_direction_streaks(DirectionStreakArray* all_direction_streaks);
 
 #endif // PROBABILITY_H

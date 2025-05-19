@@ -5,6 +5,7 @@
 #include <sys/types.h>
 
 typedef struct {
+    u_int16_t year;
     u_int8_t month;
     u_int8_t day;
     double open;
@@ -21,5 +22,17 @@ typedef struct RowArray {
 } RowArray;
 
 void read_stock_csv(const char* filename, RowArray* rows);
+
+void read_stock_csv_to_year(
+    const char* filename,
+    RowArray* rows,
+    u_int16_t end_year
+);
+
+void read_stock_csv_from_year(
+    const char* filename,
+    RowArray* rows,
+    u_int16_t start_year
+);
 
 #endif //CSV_UTIL_H

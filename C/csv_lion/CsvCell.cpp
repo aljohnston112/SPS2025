@@ -71,4 +71,19 @@ int extract_uint8_t(const char* first, const char* last, u_int8_t* out_value) {
     }
     return 0;
 }
+
+int extract_uint16_t(const char* first, const char* last, u_int16_t* out_value) {
+    const auto [_, ec] = std::from_chars(
+        first,
+        last,
+        *out_value
+    );
+    if (ec == std::errc::invalid_argument) {
+        return EINVAL;
+    }
+    if (ec == std::errc::result_out_of_range) {
+        return ERANGE;
+    }
+    return 0;
+}
 }

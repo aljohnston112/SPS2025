@@ -14,20 +14,20 @@ void mapped_file_cursor_clean_up(const MappedFileCursor* self);
 
 int mapped_file_cursor_map_file(MappedFileCursor* self, const char* filename);
 
-static long get_page_size() {
+static inline long get_page_size() {
     return sysconf(_SC_PAGESIZE);
 }
 
-static char* mapped_file_cursor_buf(const MappedFileCursor* self) {
+static inline char* mapped_file_cursor_buf(const MappedFileCursor* self) {
     return self->currentPtr;
 }
 
-static size_t mapped_file_cursor_size(const MappedFileCursor* self) {
+static inline size_t mapped_file_cursor_size(const MappedFileCursor* self) {
     return self->endPtr - self->currentPtr;
 }
 
 
-static void mapped_file_cursor_consume(MappedFileCursor* self, const size_t n) {
+static inline void mapped_file_cursor_consume(MappedFileCursor* self, const size_t n) {
     self->currentPtr += (n < mapped_file_cursor_size(self)) ? n : mapped_file_cursor_size(self);
 }
 
