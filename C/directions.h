@@ -21,55 +21,61 @@ constexpr int PROFIT_REMOVAL_BITMASK = ~(1 << WAS_PROFIT_POSITION);
 
 typedef struct {
     char* stock_symbol;
-    u_int8_t* direction_data;
-    size_t data_size;
-} DirectionDataRowArray;
-
-typedef struct {
-    DirectionDataRowArray* direction_data_arrays;
+    u_int8_t* direction_data_array;
     size_t data_size;
 } DirectionDataArray;
 
 typedef struct {
-    char* stock_symbol;
-    long* direction_streaks;
+    DirectionDataArray* direction_data_arrays;
     size_t data_size;
-} DirectionStreakRowArray;
-
-typedef struct {
-    DirectionStreakRowArray* direction_streaks_arrays;
-    size_t data_size;
-} DirectionStreakArray;
+} AllDirectionDataArrays;
 
 typedef struct {
     char* stock_symbol;
-    double direction_counts[512];
-} DirectionCounts;
+    long* profit_streak_array;
+    size_t data_size;
+} ProfitStreakArray;
 
 typedef struct {
-    DirectionCounts* direction_counts;
+    ProfitStreakArray* profit_streaks_arrays;
     size_t data_size;
-} DirectionCountsArray;
+} AllProfitStreakArrays;
+
+typedef struct {
+    char* stock_symbol;
+    double direction_count_array[512];
+} DirectionCountArray;
+
+typedef struct {
+    DirectionCountArray* direction_counts_array;
+    size_t data_size;
+} AllDirectionCountArrays;
 
 bool getDirectionData(
-    RawStockDataArray** all_stock_data,
-    DirectionDataArray** all_direction_data
+    AllStockDataArrays** all_stock_data,
+    AllDirectionDataArrays** all_direction_data
 );
 
 bool calculateDirectionCounts(
-    DirectionDataArray** all_direction_data,
-    DirectionCountsArray** all_direction_counts
+    AllDirectionDataArrays** all_direction_data,
+    AllDirectionCountArrays** all_direction_counts
 );
 
-bool getDirectionStreaks(
-    DirectionDataArray** all_direction_data,
-    DirectionStreakArray** all_direction_streaks
+bool getProfitStreaks(
+    AllDirectionDataArrays** all_direction_data,
+    AllProfitStreakArrays** all_direction_streaks
 );
 
-void freeDirectionData(DirectionDataArray* all_direction_data);
+void freeDirectionData(
+    AllDirectionDataArrays* all_direction_data
+);
 
-void freeDirectionCounts(DirectionCountsArray* all_direction_counts);
+void freeDirectionCounts(
+    AllDirectionCountArrays* all_direction_counts
+);
 
-void free_direction_streaks(DirectionStreakArray* all_direction_streaks);
+void free_direction_streaks(
+    AllProfitStreakArrays* all_direction_streaks
+);
 
 #endif // PROBABILITY_H

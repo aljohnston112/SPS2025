@@ -4,6 +4,8 @@
 #define IS_PARALLEL true
 
 #define LARGEST_STOCK_DATASET_SIZE 15844
-#define NUMBER_OF_STOCK_EXAMPLES 100 // max = 11356
+#define NUMBER_OF_STOCK_EXAMPLES 11356 // max = 11356
+
+#define SELL_LAG 0
 
 #endif //CONFIG_H

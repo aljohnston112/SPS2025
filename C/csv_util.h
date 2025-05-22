@@ -21,18 +21,11 @@ typedef struct RowArray {
     size_t data_size;
 } RowArray;
 
-void read_stock_csv(const char* filename, RowArray* rows);
-
-void read_stock_csv_to_year(
+void read_stock_csv(
     const char* filename,
     RowArray* rows,
-    u_int16_t end_year
-);
-
-void read_stock_csv_from_year(
-    const char* filename,
-    RowArray* rows,
-    u_int16_t start_year
+    const u_int16_t* start_year,
+    const u_int16_t* end_year
 );
 
 #endif //CSV_UTIL_H

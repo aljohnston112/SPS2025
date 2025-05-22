@@ -3,6 +3,7 @@
 #include <limits.h>
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/time.h>
 
 #include "file_util.h"
@@ -22,8 +23,8 @@ void printOpenMPVersion() {
 
 
 void performNaiveBayesOnEntireStockHistoryDirectionBits(
-    const DirectionDataArray* all_direction_data,
-    const DirectionCountsArray* all_direction_counts
+    const AllDirectionDataArrays* all_direction_data,
+    const AllDirectionCountArrays* all_direction_counts
 ) {
     const size_t number_of_stocks = all_direction_data->data_size;
     int boughtOnLoss = 0;
@@ -39,29 +40,32 @@ void performNaiveBayesOnEntireStockHistoryDirectionBits(
     if(IS_PARALLEL)
 #endif
     for (int i = 0; i < number_of_stocks; i++) {
-        const DirectionDataRowArray* direction_data =
+        int localBoughtOnLoss = 0;
+        int localBoughtOnProfit = 0;
+        int localTotal = 0;
+        const DirectionDataArray* direction_data =
             &all_direction_data->direction_data_arrays[i];
         for (int k = 0; k < direction_data->data_size; k++) {
-            const u_int8_t full_row = direction_data->direction_data[k];
-            const u_int8_t row_without_profit = full_row &
-                PROFIT_REMOVAL_BITMASK;
+            const u_int8_t full_row = direction_data->direction_data_array[k];
+            const u_int8_t row_without_profit =
+                full_row & PROFIT_REMOVAL_BITMASK;
             const bool was_profit = full_row >> WAS_PROFIT_POSITION;
 
-            const u_int8_t upRow = row_without_profit +
-                PROFIT_EXTRACTION_BITMASK;
-            const u_int8_t downRow = row_without_profit &
-                PROFIT_REMOVAL_BITMASK;
+            const u_int8_t upRow =
+                row_without_profit + PROFIT_EXTRACTION_BITMASK;
+            const u_int8_t downRow =
+                row_without_profit & PROFIT_REMOVAL_BITMASK;
 
             double up_probability_log = 0.0;
             double down_probability_log = 0.0;
 
             for (int j = 0; j < number_of_stocks; j++) {
-                const DirectionCounts* direction_counts = &all_direction_counts
-                    ->direction_counts[j];
-                const double up_votes = direction_counts->direction_counts[
-                    upRow];
-                const double down_votes = direction_counts->direction_counts[
-                    downRow];
+                const DirectionCountArray* direction_counts =
+                    &all_direction_counts->direction_counts_array[j];
+                const double up_votes =
+                    direction_counts->direction_count_array[upRow];
+                const double down_votes =
+                    direction_counts->direction_count_array[downRow];
                 const double sum = up_votes + down_votes;
 
                 if (sum > 0.0) {
@@ -92,13 +96,23 @@ void performNaiveBayesOnEntireStockHistoryDirectionBits(
 
             if (up_probability_log > down_probability_log) {
                 if (!was_profit) {
-                    ++boughtOnLoss;
+                    ++localBoughtOnLoss;
                 } else {
-                    ++boughtOnProfit;
+                    ++localBoughtOnProfit;
                 }
             }
-            ++total;
+            ++localTotal;
         }
+        const int sum = localBoughtOnLoss + localBoughtOnProfit;
+        if (sum != 0) {
+            printf("Bought on loss: %f \n",
+                   (double)localBoughtOnLoss / (double)sum);
+            printf("Bought on profit: %f \n",
+                   (double)localBoughtOnProfit / (double)sum);
+        }
+        boughtOnLoss += localBoughtOnLoss;
+        boughtOnProfit += localBoughtOnProfit;
+        total += localTotal;
     }
 
     const int sum = boughtOnLoss + boughtOnProfit;
@@ -108,89 +122,201 @@ void performNaiveBayesOnEntireStockHistoryDirectionBits(
 
 void run_simulation(
     const HashMap* tree,
-    const RawStockDataArray* future_stock_data,
-    const DirectionStreakArray* future_direction_streaks
+    const AllStockDataArrays* future_stock_data_array,
+    const AllProfitStreakArrays* future_profit_streak_arrays
 ) {
-    // the streak at index 1 denotes the first streak
-    // that starts at data index 3 and ends at data index (3 + streak size)
+    double profit = 1.0;
 
+    for (size_t i = 0; i < future_profit_streak_arrays->data_size; i++) {
+        const RowArray* row_array = &future_stock_data_array->row_arrays[i];
+        const Row* stock_data_rows = row_array->rows;
 
-    double profit = 0;
+        const ProfitStreakArray* profit_streak_arrays =
+            future_profit_streak_arrays->profit_streaks_arrays;
+        const ProfitStreakArray* profit_streak_array = &profit_streak_arrays[i];
 
-    for (size_t i = 0; i < future_direction_streaks->data_size; i++) {
-        const DirectionStreakRowArray* all_stock_streak_arrays =
-            future_direction_streaks->direction_streaks_arrays;
-        if (all_stock_streak_arrays->data_size > 3) {
-            const RawStockDataArray stock_data = future_stock_data[i];
+        assert(
+            strcmp(
+                row_array->stock_symbol,
+                profit_streak_array->stock_symbol
+            ) == 0
+        );
 
-            const DirectionStreakRowArray streak_row_array =
-                all_stock_streak_arrays[i];
+        // Skip the 1st streak, since it is on a boundary
+        // Then the 2nd since it a negative streak
+        // Since the tree's root starts at positive streaks,
+        // the 3rd streak needs to be skipped so it can be used for predicting
+        // when the 4th streak will end
+        const size_t number_of_profit_steaks = profit_streak_array->data_size;
+        if (number_of_profit_steaks > 3) {
+            double buy_price = 0;
+            bool bought = false;
 
-            const long* streak_array = streak_row_array.direction_streaks;
-            u_int64_t current_day = 6;
+            const long* streak_array = profit_streak_array->profit_streak_array;
+
+            // +3 so the current day is the day after a streak reversal
+            u_int64_t current_day = SELL_LAG + 3;
+
+            // Skip the 1st three streaks
             for (size_t j = 0; j < 3; j++) {
                 const long streak = streak_array[j];
-                const size_t add = streak > 0 ? streak : -streak;
-                current_day += add;
+                const size_t streak_length = streak > 0 ? streak : -streak;
+                current_day += streak_length;
             }
 
-            const long first_streak = streak_array[3];
-            assert(first_streak < 0);
-
-            // Can't know when streak became negative
-            // until one day after a negative
-            const size_t add = -first_streak;
-            size_t current_streak_end_data_index = current_day + add;
+            assert(streak_array[3] <= 0);
             for (size_t current_streak_index = 4;
-                 current_streak_index < streak_row_array.data_size;
+                 current_streak_index < number_of_profit_steaks;
                  current_streak_index++
             ) {
-                const size_t prediction = floor(
-                    get_prediction_from_hash_map(
-                        tree,
-                        streak_array,
-                        current_streak_index - 1
-                    )
+                const long current_streak = streak_array[current_streak_index];
+
+                // Current day is the day after the steak reversed
+                // A streak of length 1 ends the day before the reversal is noticed
+                const size_t streak_length =
+                    current_streak < 0
+                        ? -current_streak
+                        : current_streak;
+                const size_t current_streak_reverse_index =
+                    current_day + streak_length - 1;
+
+                double prediction;
+                get_prediction_from_hash_map(
+                    tree,
+                    streak_array + 2, // Start from the 3rd streak
+                    current_streak_index - 3,
+                    &prediction
+                );
+                const size_t buy_sell_prediction = floor(
+                    prediction < 0 ? -prediction : prediction
                 );
 
-                const long current_streak = streak_array[current_streak_index];
-                if (prediction != -1) {
-                    const size_t predicted_day = prediction + current_day;
-                    if (predicted_day <= current_streak_end_data_index) {
-                        if (current_streak < 0) {
+                // Current day is the day after the last streak reversed
+                // Since the streak started yesterday,
+                // need -1 to go back to the previous day when the streak ended
+                // Also need -1 since a streak of 1 day shouldn't add any days
+                const size_t predicted_reverse_day =
+                    buy_sell_prediction - 1 + current_day - 1;
 
-                        } else {
+                // Need to make sure the sell day is in bounds of the stock data
+                if (predicted_reverse_day < row_array->data_size) {
+                    // Want to buy only if we are on a negative streak
+                    // to catch the positive on the way back up
+                    // Want to sell only if we are on a positive streak
+                    // to miss out on the drop
+                    if ((!bought && current_streak < 0) ||
+                        (bought && current_streak > 0)
+                    ) {
+                        // We should bail if we have stock,
+                        // and we noticed the stock started a down streak
+                        // despite what the prediction says
+                        const bool streak_ended =
+                            bought &&
+                            predicted_reverse_day >
+                            current_streak_reverse_index + 1;
 
+                        // Only buy if the predicted reverse happens one day out
+                        // since we need to buy this day, and sell the next
+                        if (!bought &&
+                            predicted_reverse_day > current_day + 1
+                        ) {
+                            if (predicted_reverse_day <
+                                current_streak_reverse_index
+                            ) {
+                                printf("Bought early\n");
+                                buy_price =
+                                    stock_data_rows[predicted_reverse_day].high;
+                            } else if (predicted_reverse_day >
+                                current_streak_reverse_index
+                            ) {
+                                printf("Bought late\n");
+                                buy_price =
+                                    stock_data_rows[current_streak_reverse_index
+                                        + 1].high;
+                            } else {
+                                printf("Bought on time\n");
+                                buy_price =
+                                    stock_data_rows[predicted_reverse_day].high;
+                            }
+                            bought = true;
                         }
-                    } else {
-                        if (current_streak < 0) {
 
-                        } else {
-
+                        // Sell if streak ended early and price went up
+                        if (bought) {
+                            if (streak_ended) {
+                                const double actual_low =
+                                    stock_data_rows[current_day].low;
+                                if (actual_low > buy_price) {
+                                    bought = false;
+                                    profit *= actual_low / buy_price;
+                                    printf("Profit : %f \n", profit);
+                                }
+                            } else {
+                                if (predicted_reverse_day <
+                                    current_streak_reverse_index
+                                ) {
+                                    printf("Sold early\n");
+                                    const double sell_price =
+                                        stock_data_rows[
+                                            predicted_reverse_day + SELL_LAG + 1
+                                        ].low;
+                                    profit *= sell_price / buy_price;
+                                    printf("Profit : %f \n", profit);
+                                } else if (predicted_reverse_day >
+                                    current_streak_reverse_index
+                                ) {
+                                    printf("Sold late\n");
+                                    const double sell_price =
+                                        stock_data_rows[
+                                            current_streak_index + SELL_LAG + 1
+                                        ].low;
+                                    profit *= sell_price / buy_price;
+                                    printf("Profit : %f \n", profit);
+                                } else {
+                                    printf("Sold on time\n");
+                                    const double sell_price =
+                                        stock_data_rows[
+                                            predicted_reverse_day + SELL_LAG + 1
+                                        ].low;
+                                    profit *= sell_price / buy_price;
+                                    printf("Profit : %f \n", profit);
+                                }
+                                bought = false;
+                            }
                         }
                     }
                 }
-                printf("A");
+                current_day +=
+                    current_streak < 0
+                        ? -current_streak
+                        : current_streak;
             }
         }
     }
 }
 
 void process(void) {
-    RawStockDataArray* past_stock_data_array;
-    bool success = load_stock_data_to_year_from_disk(
-        &past_stock_data_array, 2023);
+    AllStockDataArrays* past_stock_data_array;
+
+    constexpr u_int16_t start_year = 2023;
+    constexpr u_int16_t end_year = 2024;
+    bool success = load_stock_data_from_disk(
+        &past_stock_data_array,
+        &start_year,
+        &end_year
+    );
     if (!success) {
         exit(1);
     }
 
-    DirectionDataArray* past_direction_data;
-    success = getDirectionData(&past_stock_data_array, &past_direction_data);
+    AllDirectionDataArrays* past_direction_data;
+    success = getDirectionData(&past_stock_data_array,
+                               &past_direction_data);
     if (!success) {
         exit(1);
     }
-    DirectionStreakArray* past_direction_streak_array;
-    success = getDirectionStreaks(
+    AllProfitStreakArrays* past_direction_streak_array;
+    success = getProfitStreaks(
         &past_direction_data,
         &past_direction_streak_array
     );
@@ -200,29 +326,33 @@ void process(void) {
 
     HashMap* tree = create_hash_map(0);
     for (int i = 0; i < past_direction_streak_array->data_size; i++) {
-        const DirectionStreakRowArray* direction_streak_row_array =
-            &past_direction_streak_array->direction_streaks_arrays[i];
+        const ProfitStreakArray* direction_streak_row_array =
+            &past_direction_streak_array->profit_streaks_arrays[i];
         const size_t data_size = direction_streak_row_array->data_size;
 
-        const long* data = direction_streak_row_array->direction_streaks;
+        const long* data = direction_streak_row_array->profit_streak_array;
         if (data_size > 2) {
-            constexpr size_t desired_data_length = 50;
-            const size_t past_data_size =
-                desired_data_length < data_size
-                    ? desired_data_length
-                    : data_size;
-            add_sequence(tree, data + 2, past_data_size);
+            const size_t desired_data_length = data_size;
+            // Skip the first 2 since the first is a boundary
+            // and the second is a negative number
+            // The tree root starts with a positive number
+            add_sequence(tree, data + 2, desired_data_length - 2);
         }
     }
 
-    RawStockDataArray* future_stock_data_array;
-    success = load_stock_data_from_year_from_disk(
-        &future_stock_data_array, 2024);
+    AllStockDataArrays* future_stock_data_array;
+
+    constexpr u_int16_t future_end_year = 2024;
+    success = load_stock_data_from_disk(
+        &future_stock_data_array,
+        &future_end_year,
+        nullptr
+    );
     if (!success) {
         exit(1);
     }
 
-    DirectionDataArray* future_direction_data;
+    AllDirectionDataArrays* future_direction_data;
     success = getDirectionData(
         &future_stock_data_array,
         &future_direction_data
@@ -230,29 +360,65 @@ void process(void) {
     if (!success) {
         exit(1);
     }
-    DirectionStreakArray* future_direction_streak_array;
-    success = getDirectionStreaks(
+    AllProfitStreakArrays* future_profit_streak_array;
+    success = getProfitStreaks(
         &future_direction_data,
-        &future_direction_streak_array
+        &future_profit_streak_array
     );
     if (!success) {
         exit(1);
     }
 
+
+    size_t n_correct = 0;
+    size_t n_wrong = 0;
+
+    FILE* p = popen("gnuplot -persistent", "w");
+    fprintf(p, "set title 'Actual vs Predicted'\n");
+    fprintf(p, "set xlabel 'Actual'\n");
+    fprintf(p, "set ylabel 'Predicted'\n");
+    fprintf(p, "plot '-' with points pointtype 7 title 'Data'\n");
+    for (size_t i = 0; i < future_profit_streak_array->data_size; i++) {
+        const ProfitStreakArray* direction_streak_array =
+            &future_profit_streak_array->profit_streaks_arrays[i];
+        if (direction_streak_array->data_size > 4) {
+            for (size_t j = 0; j < direction_streak_array->data_size - 3; j++) {
+                double prediction;
+                get_prediction_from_hash_map(
+                    tree,
+                    direction_streak_array->profit_streak_array + 2,
+                    j + 1,
+                    &prediction
+                );
+                if (prediction != 0.0) {
+                    const long actual = direction_streak_array->profit_streak_array[
+                        j + 3];
+                    printf("%ld vs %f\n",
+                           direction_streak_array->profit_streak_array[j + 3],
+                           prediction
+                    );
+                    fprintf(p, "%ld %f\n", actual, prediction);
+                }
+            }
+        }
+    }
+
+
     run_simulation(
         tree,
         future_stock_data_array,
-        future_direction_streak_array
+        future_profit_streak_array
     );
 
+    // print_tree(tree);
 
     // For finding the min and max streaks; useful for tuning
 
     // long max = 0;
     // long min = 0;
-    // for (int i = 0; i < direction_streak_array->data_size; i++) {
+    // for (int i = 0; i < past_direction_streak_array->data_size; i++) {
     //     const DirectionStreakRowArray* direction_streak_row_array =
-    //         &direction_streak_array->direction_streaks_arrays[i];
+    //         &past_direction_streak_array->direction_streaks_arrays[i];
     //     const long* data = direction_streak_row_array->direction_streaks;
     //     const u_long data_size = direction_streak_row_array->data_size;
     //     for (u_long k = 0; k < data_size; k++) {
@@ -267,47 +433,39 @@ void process(void) {
     // Graphs streaks as points where magnitude is streak length
 
     // FILE* p = popen("gnuplot -persistent", "w");
-    // for (int i = 0; i < direction_streak_array->data_size; i++) {
+    // for (int i = 0; i < past_direction_streak_array->data_size; i++) {
     //     fprintf(p, "set terminal qt %d\n", i);
     //     fprintf(p, "set title 'Direction Streaks %d'\n", i);
-    //     fprintf(p, "plot '-' with points pointtype 7 pointsize 0.5 title 'Direction Streaks'\n");
+    //     fprintf(
+    //         p,
+    //         "plot '-' with points pointtype 7 pointsize 0.5 title 'Direction Streaks'\n");
     //
     //     int x = 0;
     //     const DirectionStreakRowArray* direction_streak_row_array =
-    //         &direction_streak_array->direction_streaks_arrays[i];
+    //         &past_direction_streak_array->direction_streaks_arrays[i];
     //     const long* data = direction_streak_row_array->direction_streaks;
     //     const u_long data_size = direction_streak_row_array->data_size;
     //     for (u_long k = 0; k < data_size; k++) {
     //         fprintf(p, "%d %ld\n", x++, data[k]);
     //     }
-    //     fprintf(p, "e\n");
+    //     // fprintf(p, "e\n");
     // }
 
 
     // Naive bayes; a really long time to compute
 
-    // DirectionCountsArray* all_direction_counts;
-    // success = calculateDirectionCounts(&all_direction_data,
-    //                                    &all_direction_counts);
+    // DirectionCountsArray* past_direction_counts;
+    // success = calculateDirectionCounts(&past_direction_data,
+    //                                    &past_direction_counts);
     // if (!success) {
-    //     freeDirectionData(all_direction_data);
-    //     freeAllStockData(raw_stock_data_array);
-    //     return;
+    //     exit(1);
     // }
-
+    //
     // performNaiveBayesOnEntireStockHistoryDirectionBits(
-    //     all_direction_data,
-    //     all_direction_counts
+    //     past_direction_data,
+    //     past_direction_counts
     // );
 
-
-    // These are here for when valgrind is run;
-
-    // they are just too slow to run during iterations
-    // freeDirectionCounts(all_direction_counts);
-    // free_direction_streaks(direction_streak_array);
-    // freeDirectionData(all_direction_data);
-    // freeAllStockData(raw_stock_data_array);
 }
 
 int main() {
