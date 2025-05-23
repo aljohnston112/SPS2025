@@ -65,6 +65,7 @@ set(
         C/file_util.c
         C/directions.c
         C/tree.c
+        C/ranks.c
 )
 
 set(
@@ -79,6 +80,7 @@ set(
         C/directions.h
         C/config.h
         C/tree.h
+        C/ranks.h
 )
 
 add_executable(

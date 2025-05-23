@@ -54,20 +54,6 @@ void get_prediction_from_hash_map(
     double* prediction
 );
 
-// typedef struct TreeLinkedNode TreeLinkedNode;
-//
-// typedef struct {
-//     TreeLinkedNode* children;
-// } TreeNode;
-//
-// TreeNode* create_tree_node();
-//
-// void free_tree(TreeNode* node);
-//
-// TreeNode* find_child_in_tree_node(const TreeNode* parent, long key);
-//
-// TreeNode* add_child_to_tree(TreeNode* parent, long key);
-
 void add_sequence(
     HashMap* parent,
     const long* sequence,
@@ -75,21 +61,5 @@ void add_sequence(
 );
 
 void print_tree(const HashMap* root);
-
-
-/** The linked list implementation used this, but is no longer needed **/
-
-// struct TreeLinkedNode {
-//     TreeLinkedNode* next;
-//     long key;
-//     TreeNode* value;
-//     u_int64_t count;
-// };
-//
-// TreeLinkedNode* create_linked_node(long key);
-//
-// void free_linked_list(TreeLinkedNode* node);
-//
-// TreeLinkedNode* add_to_linked_list(TreeLinkedNode** head, long key);
 
 #endif //TREE_H
