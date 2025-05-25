@@ -30,36 +30,36 @@ static const size_t primes[] = {
     1669, 1693, 1697, 1699, 1709, 1721, 1723, 1733, 1741, 1747, 1753, 1759,
     1777, 1783, 1787, 1789, 1801, 1811, 1823, 1831, 1847, 1861, 1867, 1871,
     1873, 1877, 1879, 1889, 1901, 1907, 1913, 1931, 1933, 1949, 1951, 1973,
-    1979, 1987, 1993, 1997, 1999, 2003, 2011, 2017, 2027, 2029, 2039, 0
+    1979, 1987, 1993, 1997, 1999, 2003, 2011, 2017, 2027, 2029, 2039
 };
 
-typedef struct HashMap HashMap;
+typedef struct TreeHashMap TreeHashMap;
 
-struct HashMap {
-    HashMap** map;
+struct TreeHashMap {
+    TreeHashMap** map;
     u_int64_t size;
     u_int64_t current_size;
     long key;
     u_int64_t count;
 };
 
-HashMap* create_hash_map(long key);
+TreeHashMap* create_tree_hash_map(long key);
 
-HashMap* get_from_hash_map(const HashMap* map, long key);
+TreeHashMap* get_from_tree_hash_map(const TreeHashMap* map, long key);
 
 void get_prediction_from_hash_map(
-    const HashMap* map,
+    const TreeHashMap* map,
     const long* past_sequence,
     size_t sequence_length,
     double* prediction
 );
 
 void add_sequence(
-    HashMap* parent,
+    TreeHashMap* parent,
     const long* sequence,
     size_t sequence_length
 );
 
-void print_tree(const HashMap* root);
+void print_tree(const TreeHashMap* root);
 
 #endif //TREE_H

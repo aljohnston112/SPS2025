@@ -1,9 +1,6 @@
 #include <assert.h>
-#include <float.h>
-#include <limits.h>
 #include <math.h>
 #include <stdio.h>
-#include <string.h>
 #include <sys/time.h>
 
 #include "file_util.h"
@@ -11,8 +8,10 @@
 #include "config.h"
 #include "ranks.h"
 #include "tree.h"
+#include "../CPP/grapher.h"
 
 #if IS_PARALLEL
+
 void printOpenMPVersion() {
 #ifdef _OPENMP
     printf("OpenMP version: %d\n", _OPENMP);
@@ -27,7 +26,7 @@ void process(void) {
 
     constexpr u_int16_t start_year = 2023;
     constexpr u_int16_t end_year = 2024;
-    bool success = load_stock_data_from_disk(
+    const bool success = load_stock_data_from_disk(
         &past_stock_data_array,
         nullptr,
         &end_year
@@ -47,36 +46,7 @@ void process(void) {
         all_stock_ranks
     );
 
-    FILE* p = popen("gnuplot -persistent", "w");
-    fprintf(p, "set title 'Stock Ranks'\n");
-    fprintf(p, "set xlabel 'Date'\n");
-    fprintf(p, "set xdata time\n");
-    fprintf(p, "set timefmt '%%Y-%%m-%%d'\n");
-    fprintf(p, "set format x '%%Y-%%m-%%d'\n");
-    fprintf(p, "set xtics rotate by -45\n");
-    fprintf(p, "set ylabel 'Rank'\n");
-    fprintf(p, "set key outside\n");
-    fprintf(p, "plot ");
-
-    for (size_t i = 0; i < all_stock_ranks->count; i++) {
-        fprintf(p, "'-' using 1:2 with lines title '%s'%s\n",
-            all_stock_ranks->stocks[i].stock_symbol,
-            (i < all_stock_ranks->count - 1) ? ", \\" : "");
-    }
-
-    for (size_t i = 0; i < all_stock_ranks->count; i++) {
-        const StockRanks* stock_ranks = &all_stock_ranks->stocks[i];
-        for (size_t j = 0; j < stock_ranks->data_size; j++) {
-            const Row* row = &past_stock_data_array->row_arrays[i].rows[j];
-            fprintf(
-                p,
-                "%04u-%02u-%02u %ld\n",
-                row->year, row->month, row->day,
-                stock_ranks->rank_per_day[j]
-            );
-        }
-        fprintf(p, "e\n");
-    }
+    convert_and_plot(all_stock_ranks);
 
 
     // AllDirectionDataArrays* past_direction_data;

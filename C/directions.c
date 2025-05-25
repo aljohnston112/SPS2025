@@ -70,8 +70,8 @@ void getDirectionDataForSingle(
     const RowArray* stock_row_array = &all_stock_data->row_arrays[stock_index];
     const Row* currentRow = &stock_row_array->rows[0];
 
-    u_int8_t lastMonth = currentRow->month;
-    u_int8_t lastDay = currentRow->day;
+    u_int8_t lastMonth = currentRow->date.month;
+    u_int8_t lastDay = currentRow->date.day;
     double lastOpen = currentRow->open;
     double lastHigh = currentRow->high;
     double lastLow = currentRow->low;
@@ -83,8 +83,8 @@ void getDirectionDataForSingle(
             unsigned char record = 0;
             currentRow = &stock_row_array->rows[i];
 
-            const u_int8_t month = currentRow->month;
-            const u_int8_t day = currentRow->day;
+            const u_int8_t month = currentRow->date.month;
+            const u_int8_t day = currentRow->date.day;
             const double open = currentRow->open;
             const double high = currentRow->high;
             const double low = currentRow->low;

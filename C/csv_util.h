@@ -8,6 +8,10 @@ typedef struct {
     u_int16_t year;
     u_int8_t month;
     u_int8_t day;
+} Date;
+
+typedef struct {
+    Date date;
     double open;
     double high;
     double low;

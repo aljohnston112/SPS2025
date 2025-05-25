@@ -5,7 +5,57 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "config.h"
 #include "file_util.h"
+
+typedef struct {
+    RowArray* row_array;
+    size_t current_index;
+} ActiveStock;
+
+inline uint16_t hash_symbol(const char* s) {
+    uint32_t hash = 0;
+    for (int i = 0; s[i]; i++) {
+        hash = (hash << 5) ^ (s[i] - 'a');
+    }
+    return hash % RANK_MAP_SIZE;
+}
+
+StockRanks* get_from_rank_hash_map(
+    const RankHashMap* map,
+    const char* stock_symbol
+) {
+    size_t i = 0;
+    const long key = hash_symbol(stock_symbol);
+    while (1) {
+        const size_t index = (key + (i * i)) % RANK_MAP_SIZE;
+        StockRanks* stock_ranks = map->stock_to_rank[index];
+        if (stock_ranks == NULL) {
+            return nullptr;
+        }
+        if (stock_ranks->stock_symbol == stock_symbol) {
+            return stock_ranks;
+        }
+        i++;
+    }
+}
+
+void add_to_rank_hash_map(
+    RankHashMap* hash_map,
+    StockRanks* stock_ranks
+) {
+    const char* string_key = stock_ranks->stock_symbol;
+    const u_int16_t key = hash_symbol(string_key);
+    size_t i = 0;
+    // slot is occupied
+    while (hash_map->stock_to_rank[(key + (i * i)) % RANK_MAP_SIZE] != NULL) {
+        i++;
+    }
+    // found a spot to put the key, put it in the map
+    const size_t index = (key + (i * i)) % RANK_MAP_SIZE;
+    hash_map->stock_to_rank[index] = stock_ranks;
+}
+
 
 void create_all_stock_ranks(
     const AllStockDataArrays* all_stock_data,
@@ -14,14 +64,15 @@ void create_all_stock_ranks(
     const size_t number_of_stocks =
         all_stock_data->number_of_raw_stock_data_arrays;
     *all_stock_ranks = malloc(sizeof(AllStockRanks));
-    (*all_stock_ranks)->stocks =
-        malloc(sizeof(StockRanks) * number_of_stocks);
+    (*all_stock_ranks)->symbol_to_rank_map =
+        calloc(1, sizeof(RankHashMap));
     (*all_stock_ranks)->count = number_of_stocks;
 
     for (size_t i = 0; i < number_of_stocks; ++i) {
         const RowArray* row_array = &all_stock_data->row_arrays[i];
-        const size_t number_of_rows = row_array->data_size;
-        StockRanks* stock_ranks = &(*all_stock_ranks)->stocks[i];
+        constexpr size_t number_of_rows = LARGEST_STOCK_DATASET_SIZE * 2;
+
+        StockRanks* stock_ranks = malloc(sizeof(StockRanks));
         stock_ranks->stock_symbol = row_array->stock_symbol;
         stock_ranks->rank_per_day = calloc(
             number_of_rows,
@@ -31,24 +82,30 @@ void create_all_stock_ranks(
             number_of_rows,
             sizeof(size_t)
         );
+        stock_ranks->dates = calloc(
+            number_of_rows,
+            sizeof(Date*)
+        );
         stock_ranks->data_size = number_of_rows;
         stock_ranks->current_index = 0;
+        add_to_rank_hash_map(
+            (*all_stock_ranks)->symbol_to_rank_map,
+            stock_ranks
+        );
     }
 }
 
 void free_all_stock_ranks(AllStockRanks* ranks) {
-    for (size_t i = 0; i < ranks->count; ++i) {
-        free(ranks->stocks[i].stock_symbol);
-        free(ranks->stocks[i].rank_per_day);
+    for (size_t i = 0; i < RANK_MAP_SIZE; ++i) {
+        StockRanks* sr = ranks->symbol_to_rank_map->stock_to_rank[i];
+        if (sr) {
+            free(sr->rank_per_day);
+            free(sr->low_per_day);
+            free(sr->dates);
+            free(sr);
+        }
     }
-    free(ranks->stocks);
-    free(ranks);
 }
-
-typedef struct {
-    RowArray* row_array;
-    size_t current_index;
-} ActiveStock;
 
 int is_leap_year(const uint16_t year) {
     return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
@@ -81,23 +138,32 @@ void next_day(uint16_t* year, uint8_t* month, uint8_t* day) {
 int compare_by_date(const void* a, const void* b) {
     const Row* row_a = (*(RowArray**)a)->rows;
     const Row* row_b = (*(RowArray**)b)->rows;
-    if (row_a->year != row_b->year) {
-        return row_a->year - row_b->year;
+
+    const u_int16_t a_year = row_a->date.year;
+    const u_int16_t b_year = row_b->date.year;
+    if (a_year != b_year) {
+        return a_year - b_year;
     }
-    if (row_a->month != row_b->month) {
-        return row_a->month - row_b->month;
+
+    const u_int8_t a_month = row_a->date.month;
+    const u_int8_t b_month = row_b->date.month;
+    if (a_month != b_month) {
+        return a_month - b_month;
     }
-    return row_a->day - row_b->day;
+
+    return row_a->date.day - row_b->date.day;
 }
 
 int compare_by_low(const void* a, const void* b) {
-    const ActiveStock* stock_a = *((ActiveStock**)a);
-    const ActiveStock* stock_b = *((ActiveStock**)b);
+    const ActiveStock* stock_a = ((ActiveStock*)a);
+    const ActiveStock* stock_b = ((ActiveStock*)b);
     const Row* row_a =
         &stock_a->row_array->rows[stock_a->current_index];
     const Row* row_b =
         &stock_b->row_array->rows[stock_b->current_index];
-    return (row_a->low > row_b->low) - (row_a->low < row_b->low);
+    const double a_low = row_a->low;
+    const double b_low = row_b->low;
+    return (a_low > b_low) - (a_low < b_low);
 }
 
 bool date_less(
@@ -130,16 +196,20 @@ void rank_by_low(
     const AllStockDataArrays* all_stock_data,
     const AllStockRanks* all_stock_ranks
 ) {
-    const size_t number_of_stocks =
+    size_t number_of_stocks =
         all_stock_data->number_of_raw_stock_data_arrays;
 
     // Sort stock data by start date in the inactive array
     // Stocks are pulled out of inactive when the date they start comes up
     RowArray** inactive_stocks =
         malloc(sizeof(RowArray*) * number_of_stocks);
+    size_t valid_count = 0;
     for (size_t i = 0; i < number_of_stocks; i++) {
-        inactive_stocks[i] = &all_stock_data->row_arrays[i];
+        if (all_stock_data->row_arrays[i].data_size > 0) {
+            inactive_stocks[valid_count++] = &all_stock_data->row_arrays[i];
+        }
     }
+    number_of_stocks = valid_count;
     qsort(
         inactive_stocks,
         number_of_stocks,
@@ -149,62 +219,43 @@ void rank_by_low(
 
     ActiveStock* active_stocks =
         malloc(sizeof(ActiveStock) * number_of_stocks);
-    ActiveStock** rankable_stocks =
-        malloc(sizeof(ActiveStock*) * number_of_stocks);
 
     size_t active_count = 0;
     size_t inactive_index = 0;
-    size_t rankable_count = 0;
 
-    const RowArray* first = &all_stock_data->row_arrays[0];
-    uint16_t min_year = first->rows[0].year;
-    uint16_t max_year = first->rows[first->data_size - 1].year;
-    uint8_t min_month = first->rows[0].month;
-    uint8_t max_month = first->rows[first->data_size - 1].month;
-    uint8_t min_day = first->rows[0].day;
-    uint8_t max_day = first->rows[first->data_size - 1].day;
+    const RowArray* first = inactive_stocks[0];
+    uint16_t min_year = first->rows[0].date.year;
+    uint8_t min_month = first->rows[0].date.month;
+    uint8_t min_day = first->rows[0].date.day;
 
     for (size_t i = 0; i < number_of_stocks; i++) {
-        const RowArray* arr = &all_stock_data->row_arrays[i];
+        const RowArray* arr = inactive_stocks[i];
         const Row* start = &arr->rows[0];
-        const Row* end = &arr->rows[arr->data_size - 1];
 
         if (date_less(
-                start->year,
-                start->month,
-                start->day,
+                start->date.year,
+                start->date.month,
+                start->date.day,
                 min_year,
                 min_month,
                 min_day
             )
         ) {
-            min_year = start->year;
-            min_month = start->month;
-            min_day = start->day;
-        }
-        if (date_less(
-                max_year,
-                max_month,
-                max_day,
-                end->year,
-                end->month,
-                end->day
-            )
-        ) {
-            max_year = end->year;
-            max_month = end->month;
-            max_day = end->day;
+            min_year = start->date.year;
+            min_month = start->date.month;
+            min_day = start->date.day;
         }
     }
 
     uint16_t year = min_year;
     uint8_t month = min_month;
     uint8_t day = min_day;
-    while (date_less_equal(year, month, day, max_year, max_month, max_day)) {
+    while (date_less_equal(year, month, day, 2024, 12, 30)) {
         // Activate stocks starting today
         while (inactive_index < number_of_stocks) {
             const Row* row = &inactive_stocks[inactive_index]->rows[0];
-            if (row->year == year && row->month == month && row->day == day) {
+            if (row->date.year == year && row->date.month == month && row->date.
+                day == day) {
                 ActiveStock* active_stock = &active_stocks[active_count];
                 active_stock->current_index = 0;
                 active_stock->row_array = inactive_stocks[inactive_index++];
@@ -214,69 +265,62 @@ void rank_by_low(
             }
         }
 
-        // Only marks stock as rankable if they have data for today
+        // Use previous day if data is missing for today
         for (size_t j = 0; j < active_count; ++j) {
             ActiveStock* active_stock = &active_stocks[j];
             const size_t current_index = active_stock->current_index;
             const RowArray* active_stock_row = active_stock->row_array;
             if (current_index < active_stock->row_array->data_size) {
                 const Row* row = &active_stock_row->rows[current_index];
-                if (row->year == year &&
-                    row->month == month &&
-                    row->day == day
+                if (row->date.year != year ||
+                    row->date.month != month ||
+                    row->date.day != day
                 ) {
-                    rankable_stocks[rankable_count++] = active_stock;
+                    assert(active_stock->current_index > 0);
+                    active_stock->current_index--;
                 }
             }
         }
 
-        // Assert the dates on the rows are for today
-        // and sort the rankable
-        for (size_t j = 0; j < rankable_count; j++) {
-            const ActiveStock* active_stock = rankable_stocks[j];
-            const size_t ci = active_stock->current_index;
-            const Row* active_row = &active_stock->row_array->rows[ci];
-            assert(
-                active_row->day == day &&
-                active_row->month == month &&
-                active_row->year == year
-            );
-        }
         qsort(
-            rankable_stocks,
-            rankable_count,
-            sizeof(ActiveStock*),
+            active_stocks,
+            active_count,
+            sizeof(ActiveStock),
             compare_by_low
         );
 
         // Store ranks for today
-        for (size_t rank = 0; rank < rankable_count; rank++) {
-            const ActiveStock* active_stock = rankable_stocks[rank];
+        for (size_t rank = 0; rank < active_count; rank++) {
+            const ActiveStock* active_stock = &active_stocks[rank];
             const RowArray* row_array = active_stock->row_array;
-            for (size_t j = 0; j < all_stock_ranks->count; j++) {
-                StockRanks* stock_rank = &all_stock_ranks->stocks[j];
-                if (strcmp(
-                        row_array->stock_symbol,
-                        stock_rank->stock_symbol
-                    ) == 0
-                ) {
-                    const size_t current_index = stock_rank->current_index;
-                    stock_rank->rank_per_day[current_index] = rank;
-                    stock_rank->low_per_day[current_index] =
-                        row_array->rows[active_stock->current_index].low;
-                    stock_rank->current_index++;
-                    break;
-                }
-            }
+            StockRanks* stock_rank = get_from_rank_hash_map(
+                all_stock_ranks->symbol_to_rank_map,
+                active_stock->row_array->stock_symbol
+            );
+            assert(stock_rank != NULL);
+            const size_t current_index = stock_rank->current_index;
+            assert(stock_rank->current_index < stock_rank->data_size);
+            stock_rank->rank_per_day[current_index] = rank;
+            stock_rank->low_per_day[current_index] =
+                row_array->rows[active_stock->current_index].low;
+            stock_rank->dates[current_index] =
+                &row_array->rows[active_stock->current_index].date;
+            stock_rank->current_index++;
         }
 
-        for (size_t j = 0; j < rankable_count; j++) {
-            rankable_stocks[j]->current_index++;
+        for (size_t j = 0; j < active_count; j++) {
+            active_stocks[j].current_index++;
         }
-        rankable_count = 0;
         next_day(&year, &month, &day);
     }
+
+    for (size_t j = 0; j < RANK_MAP_SIZE; j++) {
+        StockRanks* s = all_stock_ranks->symbol_to_rank_map->stock_to_rank[j];
+        if (s) {
+            s->data_size = s->current_index;
+        }
+    }
+
     free(inactive_stocks);
     free(active_stocks);
-    free(rankable_stocks);
 }

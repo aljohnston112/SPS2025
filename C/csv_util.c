@@ -1,7 +1,7 @@
 #include "csv_util.h"
 
-#include "csv_lion/CsvReader.h"
-#include "csv_lion/MappedFileCursor.h"
+#include "../CPP/csv_lion/CsvReader.h"
+#include "../CPP/csv_lion/MappedFileCursor.h"
 
 /**
  * Reads stock data from the given start year up to the given end year.
@@ -40,9 +40,19 @@ void read_stock_csv(
             extract_uint16_t(date, date + 4, &year);
             if (year >= *start_year) {
                 Row* current_row = &rows->rows[0];
-                extract_uint16_t(date, date + 4, &current_row->year);
-                extract_uint8_t(date + 4, date + 6, &current_row->month);
-                extract_uint8_t(date + 6, date + 8, &current_row->day);
+
+                // Extract the date
+                u_int16_t current_year = year;
+                extract_uint16_t(date, date + 4, &current_year);
+                u_int8_t current_month;
+                extract_uint8_t(date + 4, date + 6, &current_month);
+                u_int8_t current_day;
+                extract_uint8_t(date + 6, date + 8, &current_day);
+                current_row->date = (Date){
+                    .year = current_year,
+                    .month = current_month,
+                    .day = current_day
+                };
 
                 csv_cell_as_double(openCell, &current_row->open);
                 csv_cell_as_double(highCell, &current_row->high);
@@ -66,9 +76,18 @@ void read_stock_csv(
             break;
         }
 
-        current_row->year = year;
-        extract_uint8_t(date + 4, date + 6, &current_row->month);
-        extract_uint8_t(date + 6, date + 8, &current_row->day);
+        // Extract the date
+        u_int16_t current_year = year;
+        extract_uint16_t(date, date + 4, &current_year);
+        u_int8_t current_month;
+        extract_uint8_t(date + 4, date + 6, &current_month);
+        u_int8_t current_day;
+        extract_uint8_t(date + 6, date + 8, &current_day);
+        current_row->date = (Date){
+            .year = current_year,
+            .month = current_month,
+            .day = current_day
+        };
 
         csv_cell_as_double(openCell, &current_row->open);
         csv_cell_as_double(highCell, &current_row->high);
