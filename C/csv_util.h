@@ -17,17 +17,17 @@ typedef struct {
     double low;
     double close;
     double volume;
-} Row;
+} StockDataRow;
 
-typedef struct RowArray {
+typedef struct {
     char* stock_symbol;
-    Row* rows;
-    size_t data_size;
-} RowArray;
+    StockDataRow* rows;
+    size_t row_count;
+} StockDataTable;
 
 void read_stock_csv(
     const char* filename,
-    RowArray* rows,
+    StockDataTable* table,
     const u_int16_t* start_year,
     const u_int16_t* end_year
 );

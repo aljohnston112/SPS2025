@@ -6,6 +6,7 @@
 #include "file_util.h"
 #include "directions.h"
 #include "config.h"
+#include "internal_config.h"
 #include "ranks.h"
 #include "tree.h"
 #include "../CPP/grapher.h"
@@ -21,97 +22,593 @@ void printOpenMPVersion() {
 }
 #endif
 
-void process(void) {
-    AllStockDataArrays* past_stock_data_array;
+constexpr uint16_t past_end_year = 2018;
+constexpr uint16_t past_start_year = past_end_year - 4;
 
-    constexpr u_int16_t start_year = 2023;
-    constexpr u_int16_t end_year = 2024;
+constexpr u_int16_t future_start_year = past_end_year;
+constexpr u_int16_t future_end_year = future_start_year + 4;
+
+void print_promising_stocks(
+    const TreeHashMap* yearly_tree,
+    const SymbolToRanksHashMap* all_stock_ranks
+) {
+    constexpr size_t required_data_size =
+        (DAYS_PER_DIFF + 1) + (1) + (BUY_SELL_LAG);
+    printf("Promising stocks:\n");
+
+    for (size_t j = 0; j < all_stock_ranks->count; j++) {
+        const StockRanks* stock_ranks = all_stock_ranks->symbol_to_ranks[j];
+        if (!stock_ranks || stock_ranks->data_size < required_data_size) {
+            continue;
+        }
+        const size_t sequence_length =
+            stock_ranks->data_size < MAX_TREE_DEPTH
+                ? stock_ranks->data_size
+                : MAX_TREE_DEPTH;
+
+        const long* past_sequence = &stock_ranks->rank_diffs[
+            stock_ranks->data_size - sequence_length
+        ];
+
+        double prediction = 0.0;
+        size_t depth = 0;
+        get_prediction_from_hash_map(
+            yearly_tree,
+            past_sequence,
+            sequence_length,
+            &prediction,
+            &depth
+        );
+
+        if (prediction > PREDICTION_THRESHOLD) {
+            printf(
+                "Symbol: %s | Prediction: %.3f | Depth: %zu\n",
+                stock_ranks->stock_symbol,
+                prediction,
+                depth
+            );
+        }
+    }
+}
+
+void create_future_diffs_and_print_promising_stocks(
+    const TreeHashMap* tree,
+    const StockDataTables future_stock_data_tables
+) {
+    // future_stock_ranks needs to be freed
+    // -------------------------------------------------------------------------
+    auto future_stock_ranks = (SymbolToRanksHashMap){
+        .count = 0
+    };
+    initialize_symbol_to_ranks_hash_map(
+        &future_stock_data_tables,
+        &future_stock_ranks
+    );
+
+    rank_stocks_by_low(
+        &future_stock_data_tables,
+        &future_stock_ranks,
+        DAYS_PER_DIFF,
+        BUY_SELL_LAG
+    );
+
+    print_promising_stocks(
+        tree,
+        &future_stock_ranks
+    );
+
+    // future_stock_ranks freed
+    // -------------------------------------------------------------------------
+    free_symbol_to_ranks_hash_map(&future_stock_ranks);
+}
+
+void load_future_data_then_create_future_diffs_and_print_promising_stocks(
+    const TreeHashMap* tree
+) {
+    // future_stock_data_tables needs to be freed
+    // -------------------------------------------------------------------------
+    auto future_stock_data_tables = (StockDataTables){
+        .tables = nullptr,
+        .table_count = 0
+    };
+
+
+    constexpr uint16_t start_year = 2025;
     const bool success = load_stock_data_from_disk(
-        &past_stock_data_array,
+        &future_stock_data_tables,
+        &start_year,
         nullptr,
-        &end_year
+        INTERMEDIATE_DATA_FOLDER
     );
     if (!success) {
         exit(1);
     }
 
-    AllStockRanks* all_stock_ranks;
-    create_all_stock_ranks(
-        past_stock_data_array,
-        &all_stock_ranks
+    create_future_diffs_and_print_promising_stocks(
+        tree, future_stock_data_tables);
+
+    // future_stock_data_tables freed
+    // -------------------------------------------------------------------------
+    free_stock_data_tables(&future_stock_data_tables);
+}
+
+/**
+ * Adds rank_diff sequences and whether they lead to profit (went_up)
+ * (BUY_SELL_LAG + 1) days after the diff sequence.
+ * All stocks and subsequences will be added to the tree.
+ *
+ * @param symbol_to_ranks_map A map of stock symbols to rank data.
+ *                            The rank data must include rank_diffs
+ *                            and went_up data.
+ * @param tree The tree to feed the rank_diffs sequence data to.
+ */
+void fill_tree(
+    const SymbolToRanksHashMap* symbol_to_ranks_map,
+    TreeHashMap* tree
+) {
+    // (the diff size) + (the day after_diff) + (the price lag)
+    constexpr size_t required_data_size =
+        (DAYS_PER_DIFF + 1) + (1) + (BUY_SELL_LAG);
+
+    for (size_t j = 0; j < RANK_MAP_SIZE; j++) {
+        const StockRanks* stock_ranks =
+            symbol_to_ranks_map->symbol_to_ranks[j];
+        if (stock_ranks) {
+            const size_t data_size = stock_ranks->data_size;
+            const size_t desired_data_length = data_size;
+            const size_t actual_data_size = data_size < desired_data_length
+                                                ? data_size
+                                                : desired_data_length;
+            if (data_size >= required_data_size) {
+                for (size_t i = DAYS_PER_DIFF;
+                     i < actual_data_size - BUY_SELL_LAG - 1;
+                     i++
+                ) {
+                    add_sequence(
+                        tree,
+                        stock_ranks->rank_diffs + i,
+                        // 1 and buy_sell_lag are because no data is generated past that
+                        // 1 is for the gap day between when a diff is seen and the buy/sell
+                        actual_data_size - i - 1 - BUY_SELL_LAG,
+                        stock_ranks->went_up + i,
+                        MAX_TREE_DEPTH
+                    );
+                }
+            }
+        }
+    }
+}
+
+void create_past_tree_then_create_future_diffs_and_print_promising_stocks(
+    const SymbolToRanksHashMap* past_symbol_to_ranks_map
+) {
+    // TODO tree needs to be freed
+    // -------------------------------------------------------------------------
+    TreeHashMap* tree = create_tree_hash_map(0);
+    fill_tree(past_symbol_to_ranks_map, tree);
+    print_tree(tree);
+    load_future_data_then_create_future_diffs_and_print_promising_stocks(tree);
+}
+
+void create_diffs_and_print_promising_stocks(
+    const StockDataTables* past_stock_data_tables
+) {
+    // past_symbol_to_ranks_map must be freed
+    // -------------------------------------------------------------------------
+    auto past_symbol_to_ranks_map = (SymbolToRanksHashMap){
+        .count = 0
+    };
+    initialize_symbol_to_ranks_hash_map(
+        past_stock_data_tables,
+        &past_symbol_to_ranks_map
     );
 
-    rank_by_low(
-        past_stock_data_array,
-        all_stock_ranks
+    rank_stocks_by_low(
+        past_stock_data_tables,
+        &past_symbol_to_ranks_map,
+        DAYS_PER_DIFF,
+        BUY_SELL_LAG
     );
 
-    convert_and_plot(all_stock_ranks);
 
+    create_past_tree_then_create_future_diffs_and_print_promising_stocks(
+        &past_symbol_to_ranks_map
+    );
 
-    // AllDirectionDataArrays* past_direction_data;
-    // success = getDirectionData(
-    //     &past_stock_data_array,
-    //     &past_direction_data
-    // );
-    // if (!success) {
-    //     exit(1);
-    // }
-    // AllProfitStreakArrays* past_direction_streak_array;
-    // success = getProfitStreaks(
-    //     &past_direction_data,
-    //     &past_direction_streak_array
-    // );
-    // if (!success) {
-    //     exit(1);
-    // }
+    // past_symbol_to_ranks_map freed
+    // -------------------------------------------------------------------------
+    free_symbol_to_ranks_hash_map(&past_symbol_to_ranks_map);
+}
 
-    // HashMap* tree = create_hash_map(0);
-    // for (int i = 0; i < past_direction_streak_array->data_size; i++) {
-    //     const ProfitStreakArray* direction_streak_row_array =
-    //         &past_direction_streak_array->profit_streaks_arrays[i];
-    //     const size_t data_size = direction_streak_row_array->data_size;
-    //
-    //     const long* data = direction_streak_row_array->profit_streak_array;
-    //     if (data_size > 2) {
-    //         const size_t desired_data_length = data_size;
-    //         // Skip the first 2 since the first is a boundary
-    //         // and the second is a negative number
-    //         // The tree root starts with a positive number
-    //         add_sequence(tree, data + 2, desired_data_length - 2);
-    //     }
-    // }
+void process_and_print_promising_stocks(void) {
+    // past_stock_data_tables needs to be freed
+    // -------------------------------------------------------------------------
+    auto past_stock_data_tables = (StockDataTables){
+        .tables = nullptr,
+        .table_count = 0
+    };
 
-    // AllStockDataArrays* future_stock_data_array;
-    //
-    // constexpr u_int16_t future_end_year = 2024;
-    // success = load_stock_data_from_disk(
-    //     &future_stock_data_array,
-    //     &future_end_year,
-    //     nullptr
-    // );
-    // if (!success) {
-    //     exit(1);
-    // }
-    //
-    // AllDirectionDataArrays* future_direction_data;
-    // success = getDirectionData(
-    //     &future_stock_data_array,
-    //     &future_direction_data
-    // );
-    // if (!success) {
-    //     exit(1);
-    // }
-    // AllProfitStreakArrays* future_profit_streak_array;
-    // success = getProfitStreaks(
-    //     &future_direction_data,
-    //     &future_profit_streak_array
-    // );
-    // if (!success) {
-    //     exit(1);
-    // }
+    constexpr uint16_t start = 2024;
+    constexpr uint16_t end = 2025;
+    const bool success = load_stock_data_from_disk(
+        &past_stock_data_tables,
+        &start,
+        &end,
+        INTERMEDIATE_DATA_FOLDER
+    );
+    if (!success) {
+        exit(1);
+    }
+    create_diffs_and_print_promising_stocks(&past_stock_data_tables);
 
+    // past_stock_data_tables freed
+    // -------------------------------------------------------------------------
+    free_stock_data_tables(&past_stock_data_tables);
+}
+
+typedef struct {
+    double buy_price;
+    size_t buy_day;
+    double sell_price;
+    size_t sell_day;
+    double shares;
+} OpenTrade;
+
+void run_backtest(
+    const TreeHashMap* yearly_tree,
+    const SymbolToRanksHashMap* all_stock_ranks
+) {
+    // Start with $1
+    double capital = 1.0;
+
+    // Track how many trades happen and how many profit
+    size_t total_trades = 0;
+    size_t n_profit = 0;
+
+    // Track open trades
+    OpenTrade* open_trades =
+        malloc(NUMBER_OF_STOCK_EXAMPLES * NUMBER_OF_STOCK_EXAMPLES * sizeof(OpenTrade));
+    size_t num_open_trades = 0;
+
+    // Find the stock with the max number of data points
+    size_t max_days = 0;
+    for (size_t j = 0; j < all_stock_ranks->count; j++) {
+        const StockRanks* stock = all_stock_ranks->symbol_to_ranks[j];
+        if (stock && stock->data_size > max_days) {
+            max_days = stock->data_size;
+        }
+    }
+
+    // Track when stocks are bailed
+    bool* bailed = calloc(all_stock_ranks->count, sizeof(bool));
+    size_t* bail_days = calloc(all_stock_ranks->count, sizeof(size_t));
+
+    // For every day, up to a day when there is still room to sell
+    for (
+        size_t i = DAYS_PER_DIFF;
+        i < max_days - BUY_SELL_LAG - 1;
+        i++
+    ) {
+        // Go through all stocks
+        for (size_t j = 0; j < all_stock_ranks->count; j++) {
+
+            // This is future data
+            const StockRanks* stock_ranks =
+                all_stock_ranks->symbol_to_ranks[j];
+
+            // If the stock has enough data
+            if (stock_ranks && stock_ranks->data_size > BUY_SELL_LAG) {
+                // Go through every day in the data minus room to check for a sale
+
+                // Bail out if we decided to bail earlier
+                if (bailed[j] && bail_days[j] != 0 &&  bail_days[j] <= i) {
+                    continue;
+                }
+
+                // Close trades that were calculated to be sold this day
+                for (size_t k = 0; k < num_open_trades; k++) {
+                    // The trade to close
+                    const auto open_trade = open_trades[k];
+
+                    // If it is to be sold today
+                    if (open_trade.sell_day == i) {
+                        const double sell_price = open_trade.sell_price;
+
+                        // Money from selling the stock
+                        const double money_from_stock_sold =
+                            sell_price * open_trade.shares;
+
+                        // Add it back to the capital pool
+                        capital += money_from_stock_sold;
+                        total_trades++;
+
+                        // And remove it from memory
+                        open_trades[k] = open_trades[--num_open_trades];
+                        k--;
+
+                        // Print current capital
+                        printf(
+                            "Trade %zu after %lu days: Buy at %.2f, Sell at %.2f, Total Capital: %.2f \n",
+                            total_trades,
+                            open_trade.sell_day - open_trade.buy_day,
+                            open_trade.buy_price,
+                            sell_price,
+                            capital
+                        );
+                    }
+                }
+
+                // Crash the program if there is not enough memory
+                if (num_open_trades >= NUMBER_OF_STOCK_EXAMPLES) {
+                    fprintf(stderr, "Too many open trades!\n");
+                    exit(1);
+                }
+
+                // The tree can only use so much data
+                const size_t sequence_length =
+                    i < MAX_TREE_DEPTH ? i : MAX_TREE_DEPTH;
+
+                // Get that data and ask the tree whether it thinks we should buy
+                const long* past_sequence =
+                    &stock_ranks->rank_diffs[0 + (i - sequence_length)];
+                double prediction = 0.0;
+                size_t depth = 0;
+                get_prediction_from_hash_map(
+                    yearly_tree,
+                    past_sequence,
+                    sequence_length,
+                    &prediction,
+                    &depth
+                );
+
+                // If the tree says we should buy and there is room to sell
+                if (prediction > PREDICTION_THRESHOLD &&
+                    i + 1 + BUY_SELL_LAG < stock_ranks->data_size &&
+                    i + 1 + BUY_SELL_LAG > i
+                ) {
+                    // Only consider stocks under $20
+                    const double buy_price = stock_ranks->high_per_day[i + 1];
+                    if (buy_price < 10) {
+                        // Assume default sell date
+                        uint64_t sell_day = 1 + i + BUY_SELL_LAG;
+                        double sell_price =
+                            stock_ranks->low_per_day[sell_day];
+
+                        // But see if we can sell earlier for 50% profit,
+                        // hold until 50% profit
+                        // or wait til the stock reaches last stock day
+                        for (size_t day = i + 2;
+                             day < stock_ranks->data_size;
+                             day++
+                        ) {
+                            // Definitely want to sell if stock reached 50%
+                            if (stock_ranks->low_per_day[day] >=
+                                buy_price * 1.5
+                            ) {
+                                sell_price = stock_ranks->low_per_day[day];
+                                sell_day = day;
+                                break;
+                            }
+                        }
+
+                        // For tracking how many trades were a profit
+                        if (sell_price > buy_price) {
+                            n_profit++;
+                        }
+
+                        // Take 1% of the current capital and use it to buy the stock
+                        const double spent = capital * 0.01;
+                        open_trades[num_open_trades++] = (OpenTrade){
+                            .buy_price = buy_price,
+                            .buy_day = i + 1,
+                            .sell_day = sell_day,
+                            .shares = spent / buy_price,
+                            .sell_price = sell_price
+                        };
+                        capital -= spent;
+
+                        // If the trade resulted in a loss, do not consider it again
+                        if (sell_price < buy_price && !bailed[j]) {
+                            printf(
+                                "Bailing on stock: %s after selling for %.2f\n",
+                                stock_ranks->stock_symbol,
+                                (sell_price / buy_price)
+                            );
+                            bail_days[j] = sell_day;
+                            bailed[j] = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    free(bailed);
+    free(bail_days);
+    free(open_trades);
+
+    printf(
+        "Backtest finished. \n    Total trades: %zu, \n    Capital: %.2f\n    Percent of trades that resulted in profit: %.2f\n",
+        total_trades,
+        capital,
+        (double)n_profit / (double)total_trades
+    );
+}
+
+void create_future_diffs_and_run_back_test(
+    const TreeHashMap* tree,
+    const StockDataTables future_stock_data_tables
+) {
+    // future_stock_ranks needs to be freed
+    // -------------------------------------------------------------------------
+    auto future_stock_ranks = (SymbolToRanksHashMap){
+        .count = 0
+    };
+    initialize_symbol_to_ranks_hash_map(
+        &future_stock_data_tables,
+        &future_stock_ranks
+    );
+
+    rank_stocks_by_low(
+        &future_stock_data_tables,
+        &future_stock_ranks,
+        DAYS_PER_DIFF,
+        BUY_SELL_LAG
+    );
+
+    run_backtest(
+        tree,
+        &future_stock_ranks
+    );
+
+    // future_stock_ranks freed
+    // -------------------------------------------------------------------------
+    free_symbol_to_ranks_hash_map(&future_stock_ranks);
+}
+
+void load_future_data_then_create_future_diffs_and_run_back_test(
+    const TreeHashMap* tree
+) {
+    // future_stock_data_tables needs to be freed
+    // -------------------------------------------------------------------------
+    auto future_stock_data_tables = (StockDataTables){
+        .tables = nullptr,
+        .table_count = 0
+    };
+
+    const bool success = load_stock_data_from_disk(
+        &future_stock_data_tables,
+        &future_start_year,
+        &future_end_year,
+        INTERMEDIATE_DATA_FOLDER
+    );
+    if (!success) {
+        exit(1);
+    }
+
+    create_future_diffs_and_run_back_test(tree, future_stock_data_tables);
+
+    // future_stock_data_tables freed
+    // -------------------------------------------------------------------------
+    free_stock_data_tables(&future_stock_data_tables);
+}
+
+void create_past_tree_then_create_future_diffs_and_run_back_test(
+    const SymbolToRanksHashMap* past_symbol_to_ranks_map
+) {
+    // TODO tree needs to be freed
+    // -------------------------------------------------------------------------
+    TreeHashMap* tree = create_tree_hash_map(0);
+    fill_tree(past_symbol_to_ranks_map, tree);
     // print_tree(tree);
+    load_future_data_then_create_future_diffs_and_run_back_test(tree);
+}
+
+void print_stats(const SymbolToRanksHashMap* past_symbol_to_ranks_map) {
+    // (the diff size) + (the day after_diff) + (the price lag)
+    constexpr size_t required_data_size = (DAYS_PER_DIFF + 1) + (1) + (
+        BUY_SELL_LAG);
+
+    size_t sum_of_subsequences = 0;
+    size_t sum_data_points = 0;
+    size_t max_data_size = 0;
+    for (size_t j = 0; j < RANK_MAP_SIZE; j++) {
+        const StockRanks* stock_ranks =
+            past_symbol_to_ranks_map->symbol_to_ranks[j];
+        if (stock_ranks) {
+            const size_t data_size = stock_ranks->data_size;
+            if (data_size > max_data_size) {
+                max_data_size = data_size;
+            }
+            sum_of_subsequences +=
+                data_size + (MAX_TREE_DEPTH * (data_size - MAX_TREE_DEPTH + 1));
+            sum_data_points += data_size;
+        }
+    }
+
+    printf("Number of subsequences: %lu\n", sum_of_subsequences);
+    printf("Max data size: %lu\n", max_data_size);
+    printf("Number of data points: %lu\n", sum_data_points);
+
+    int64_t min_rank_diff = INT64_MAX;
+    int64_t max_rank_diff = INT64_MIN;
+    for (size_t j = 0; j < RANK_MAP_SIZE; j++) {
+        const StockRanks* stock_ranks =
+            past_symbol_to_ranks_map->symbol_to_ranks[j];
+        if (stock_ranks) {
+            const size_t data_size = stock_ranks->data_size;
+            if (data_size >= required_data_size) {
+                for (size_t i = DAYS_PER_DIFF;
+                     // (the data size) - (the day after a diff) - (the price lag)
+                     i < data_size - 1 - BUY_SELL_LAG;
+                     i++
+                ) {
+                    const int64_t rank_diff = stock_ranks->rank_diffs[i];
+                    if (rank_diff < min_rank_diff) {
+                        min_rank_diff = rank_diff;
+                    } else if (rank_diff > max_rank_diff) {
+                        max_rank_diff = rank_diff;
+                    }
+                }
+            }
+        }
+    }
+    printf("Min: %ld\n", min_rank_diff);
+    printf("Max: %ld\n", max_rank_diff);
+}
+
+void create_diffs_and_run_back_test(
+    const StockDataTables* past_stock_data_tables
+) {
+    // past_symbol_to_ranks_map must be freed
+    // -------------------------------------------------------------------------
+    auto past_symbol_to_ranks_map = (SymbolToRanksHashMap){
+        .count = 0
+    };
+    initialize_symbol_to_ranks_hash_map(
+        past_stock_data_tables,
+        &past_symbol_to_ranks_map
+    );
+
+    rank_stocks_by_low(
+        past_stock_data_tables,
+        &past_symbol_to_ranks_map,
+        DAYS_PER_DIFF,
+        BUY_SELL_LAG
+    );
+
+    print_stats(&past_symbol_to_ranks_map);
+
+    create_past_tree_then_create_future_diffs_and_run_back_test(
+        &past_symbol_to_ranks_map
+    );
+
+    // past_symbol_to_ranks_map freed
+    // -------------------------------------------------------------------------
+    free_symbol_to_ranks_hash_map(&past_symbol_to_ranks_map);
+}
+
+void process(void) {
+    // past_stock_data_tables needs to be freed
+    // -------------------------------------------------------------------------
+    auto past_stock_data_tables = (StockDataTables){
+        .tables = nullptr,
+        .table_count = 0
+    };
+    const bool success = load_stock_data_from_disk(
+        &past_stock_data_tables,
+        &past_start_year,
+        &past_end_year,
+        INTERMEDIATE_DATA_FOLDER
+    );
+    if (!success) {
+        exit(1);
+    }
+    create_diffs_and_run_back_test(&past_stock_data_tables);
+
+    // past_stock_data_tables freed
+    // -------------------------------------------------------------------------
+    free_stock_data_tables(&past_stock_data_tables);
 }
 
 int main() {
@@ -124,6 +621,8 @@ int main() {
 
     process();
 
+    // process_and_print_promising_stocks();
+
     gettimeofday(&stop, NULL);
     const double time_taken =
         (double)(stop.tv_usec - start.tv_usec) / 1000000 +
@@ -132,3 +631,70 @@ int main() {
 
     return 0;
 }
+
+// convert_and_plot(all_stock_ranks);
+//
+//
+// AllDirectionDataArrays* past_direction_data;
+// success = getDirectionData(
+//     &past_stock_data_array,
+//     &past_direction_data
+// );
+// if (!success) {
+//     exit(1);
+// }
+// AllProfitStreakArrays* past_direction_streak_array;
+// success = getProfitStreaks(
+//     &past_direction_data,
+//     &past_direction_streak_array
+// );
+// if (!success) {
+//     exit(1);
+// }
+//
+// HashMap* tree = create_hash_map(0);
+// for (int i = 0; i < past_direction_streak_array->data_size; i++) {
+//     const ProfitStreakArray* direction_streak_row_array =
+//         &past_direction_streak_array->profit_streaks_arrays[i];
+//     const size_t data_size = direction_streak_row_array->data_size;
+//
+//     const long* data = direction_streak_row_array->profit_streak_array;
+//     if (data_size > 2) {
+//         const size_t desired_data_length = data_size;
+//         // Skip the first 2 since the first is a boundary
+//         // and the second is a negative number
+//         // The tree root starts with a positive number
+//         add_sequence(tree, data + 2, desired_data_length - 2);
+//     }
+// }
+//
+// AllStockDataArrays* future_stock_data_array;
+//
+// constexpr u_int16_t future_end_year = 2024;
+// success = load_stock_data_from_disk(
+//     &future_stock_data_array,
+//     &future_end_year,
+//     nullptr
+// );
+// if (!success) {
+//     exit(1);
+// }
+//
+// AllDirectionDataArrays* future_direction_data;
+// success = getDirectionData(
+//     &future_stock_data_array,
+//     &future_direction_data
+// );
+// if (!success) {
+//     exit(1);
+// }
+// AllProfitStreakArrays* future_profit_streak_array;
+// success = getProfitStreaks(
+//     &future_direction_data,
+//     &future_profit_streak_array
+// );
+// if (!success) {
+//     exit(1);
+// }
+
+// print_tree(tree);

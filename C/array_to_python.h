@@ -5,7 +5,7 @@
 #include "file_util.h"
 
 typedef struct {
-    AllStockDataArrays* raw_stock_data;
+    StockDataTables* raw_stock_data;
     AllDirectionDataArrays* directions;
     AllDirectionCountArrays* direction_counts;
     size_t size;

@@ -52,7 +52,7 @@ typedef struct {
 } AllDirectionCountArrays;
 
 bool getDirectionData(
-    AllStockDataArrays** all_stock_data,
+    StockDataTables** all_stock_data,
     AllDirectionDataArrays** all_direction_data
 );
 

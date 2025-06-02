@@ -8,14 +8,14 @@
 #include "file_util.h"
 
 bool allocateDirectionDataArrays(
-    const AllStockDataArrays* raw_stock_data_array,
+    const StockDataTables* raw_stock_data_array,
     AllDirectionDataArrays* all_direction_data
 ) {
     assert(raw_stock_data_array != NULL);
     assert(all_direction_data != NULL);
 
     const size_t number_of_stocks =
-        raw_stock_data_array->number_of_raw_stock_data_arrays;
+        raw_stock_data_array->table_count;
     all_direction_data->data_size = number_of_stocks;
     all_direction_data->direction_data_arrays = malloc(
         number_of_stocks * sizeof(DirectionDataArray)
@@ -26,13 +26,13 @@ bool allocateDirectionDataArrays(
     }
 
     for (int i = 0; i < number_of_stocks; i++) {
-        const RowArray* raw_stock_data_row_array =
-            &raw_stock_data_array->row_arrays[i];
-        size_t direction_data_size = raw_stock_data_row_array->data_size - SELL_LAG - 1;
+        const StockDataTable* raw_stock_data_row_array =
+            &raw_stock_data_array->tables[i];
+        size_t direction_data_size = raw_stock_data_row_array->row_count - BUY_SELL_LAG - 1;
 
         // + 2 since a lag of 0 means sell the next day
         // and at least two days are needed for one buy/sell cycle
-        if (raw_stock_data_row_array->data_size < SELL_LAG + 2) {
+        if (raw_stock_data_row_array->row_count < BUY_SELL_LAG + 2) {
             direction_data_size = 0;
         }
 
@@ -53,7 +53,7 @@ bool allocateDirectionDataArrays(
 }
 
 void getDirectionDataForSingle(
-    const AllStockDataArrays* all_stock_data,
+    const StockDataTables* all_stock_data,
     const AllDirectionDataArrays* all_direction_data,
     const int stock_index
 ) {
@@ -67,8 +67,8 @@ void getDirectionDataForSingle(
         return;
     }
 
-    const RowArray* stock_row_array = &all_stock_data->row_arrays[stock_index];
-    const Row* currentRow = &stock_row_array->rows[0];
+    const StockDataTable* stock_row_array = &all_stock_data->tables[stock_index];
+    const StockDataRow* currentRow = &stock_row_array->rows[0];
 
     u_int8_t lastMonth = currentRow->date.month;
     u_int8_t lastDay = currentRow->date.day;
@@ -78,8 +78,8 @@ void getDirectionDataForSingle(
     double lastClose = currentRow->close;
     double lastVolume = currentRow->volume;
 
-    if (stock_row_array->data_size >= SELL_LAG) {
-        for (int i = SELL_LAG + 1; i < stock_row_array->data_size; i++) {
+    if (stock_row_array->row_count >= BUY_SELL_LAG) {
+        for (int i = BUY_SELL_LAG + 1; i < stock_row_array->row_count; i++) {
             unsigned char record = 0;
             currentRow = &stock_row_array->rows[i];
 
@@ -118,14 +118,14 @@ void getDirectionDataForSingle(
                 record += (1 << VOLUME_POSITION);
             }
 
-            const double buy_day_high = stock_row_array->rows[i - SELL_LAG - 1].high;
+            const double buy_day_high = stock_row_array->rows[i - BUY_SELL_LAG - 1].high;
             const double sell_day_low = low;
             if (sell_day_low > buy_day_high) {
                 record += (1 << WAS_PROFIT_POSITION);
             }
 
-            assert(i - SELL_LAG - 1 >= 0);
-            direction_data->direction_data_array[i - SELL_LAG - 1] = record;
+            assert(i - BUY_SELL_LAG - 1 >= 0);
+            direction_data->direction_data_array[i - BUY_SELL_LAG - 1] = record;
 
             lastMonth = month;
             lastDay = day;
@@ -143,7 +143,7 @@ void getDirectionDataForSingle(
  * @param all_direction_data The direction data.
  */
 bool getDirectionData(
-    AllStockDataArrays** all_stock_data,
+    StockDataTables** all_stock_data,
     AllDirectionDataArrays** all_direction_data
 ) {
     (*all_direction_data) = malloc(sizeof(AllDirectionDataArrays));

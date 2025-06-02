@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <dirent.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,6 +12,31 @@
 #include "csv_util.h"
 #include "internal_config.h"
 
+void free_stock_data_tables(const StockDataTables* stock_data_tables) {
+    for (
+        int i = 0;
+        i < stock_data_tables->table_count;
+        i++
+    ) {
+        free(stock_data_tables->tables[i].rows);
+        free(stock_data_tables->tables[i].stock_symbol);
+    }
+    free(stock_data_tables->tables);
+}
+
+/**
+ * Frees every file path string in the file path list.
+ *
+ * @param file_path_list The file path list to free all the paths of.
+ */
+void freeAllFilesPaths(FilePathList* file_path_list) {
+    for (int i = 0; i < file_path_list->file_count; i++) {
+        free(file_path_list->file_paths[i]);
+    }
+    free(file_path_list->file_paths);
+    file_path_list->file_count = 0;
+}
+
 /**
  * Extracts the stock name from a file path.
  *
@@ -18,8 +44,6 @@
  * @return The returned string must be freed by the caller.
  */
 char* extract_symbol(const char* path) {
-    assert(path != NULL);
-
     char* symbol = nullptr;
     const char* lastSlashPosition = strrchr(path, '/');
     if (lastSlashPosition != NULL) {
@@ -27,162 +51,228 @@ char* extract_symbol(const char* path) {
         const char* dotPosition = strchr(lastSlashPosition, '.');
         assert(dotPosition != NULL);
 
-        const size_t length = dotPosition - lastSlashPosition;
-        symbol = malloc(length + 1); // +1 for null-terminator
+        const size_t symbol_length = dotPosition - lastSlashPosition;
+        symbol = malloc(symbol_length + 1); // +1 for null-terminator
         if (symbol == NULL) {
-            perror("malloc failed");
-            return nullptr;
+            perror("Failed to allocate memory for symbol string");
+            exit(EXIT_FAILURE);
         }
-        strncpy(symbol, lastSlashPosition, length);
-        symbol[length] = '\0';
+        strncpy(symbol, lastSlashPosition, symbol_length);
+        symbol[symbol_length] = '\0';
     }
-
-    assert(symbol != NULL);
     return symbol;
 }
 
-void getAllFilesPaths(const char* folder, FileData* file_data) {
-    DIR* dir = opendir(folder);
-    if (dir == NULL) {
-        perror("opendir failed");
-        exit(1);
-    }
-
-    file_data->file_paths =
-        malloc(NUMBER_OF_STOCK_EXAMPLES * sizeof(char*));
-    if (file_data->file_paths == NULL) {
-        perror("malloc failed");
-        closedir(dir);
-        exit(1);
-    }
-
-    struct dirent* entry;
-    file_data->file_count = 0;
-
-    while ((entry = readdir(dir)) != NULL &&
-        file_data->file_count < NUMBER_OF_STOCK_EXAMPLES
-    ) {
-        char full_path[4096];
-        snprintf(
-            full_path,
-            sizeof(full_path),
-            "%s/%s",
-            folder,
-            entry->d_name
-        );
-        struct stat file_stat;
-        if (stat(full_path, &file_stat) == 0 && S_ISREG(file_stat.st_mode)) {
-            file_data->file_paths[file_data->file_count] = strdup(full_path);
-            if (file_data->file_paths[file_data->file_count] == NULL) {
-                perror("strdup failed");
-                closedir(dir);
-                exit(1);
-            }
-            ++file_data->file_count;
-        }
-    }
-    closedir(dir);
-}
-
-void freeAllFilesPaths(const FileData* file_data) {
-    for (int i = 0; i < file_data->file_count; i++) {
-        free(file_data->file_paths[i]);
-    }
-    free(file_data->file_paths);
-}
-
-void load_raw_stock_data(
-    const FileData* file_data,
-    const AllStockDataArrays* raw_stock_data_results,
-    const u_int16_t* start_year,
-    const u_int16_t* end_year
+/**
+ * Loads stock data from files in the file list.
+ *
+ * @param file_path_list The list of files to load data from.
+ * @param stock_data_tables The tables where stock data will be loaded into.
+* @param start_year The first year, inclusive,
+ *                   of the stock data to be loaded.
+ *                   If null, stock data will be loaded from the beginning.
+ * @param end_year The last year, exclusive,
+ *                 of the stack data to be loaded.
+ *                 If null, stock data will be loaded to the end.
+ */
+void load_stock_data_from_files(
+    const FilePathList* file_path_list,
+    const StockDataTables* stock_data_tables,
+    const uint16_t* start_year,
+    const uint16_t* end_year
 ) {
+    const size_t file_count = file_path_list->file_count;
 #if IS_PARALLEL
 #pragma omp parallel \
-    for default(none) \
-    shared(file_data, raw_stock_data_results, start_year, end_year) \
-    num_threads(180) \
-    proc_bind(close)
+for default(none) \
+shared(file_count, file_path_list, stock_data_tables, start_year, end_year) \
+num_threads(180) \
+proc_bind(close)
 #endif
-    for (int i = 0; i < file_data->file_count; i++) {
-        const char* file_name = file_data->file_paths[i];
-        RowArray* row_array = &raw_stock_data_results->row_arrays[i];
-        row_array->stock_symbol = extract_symbol(file_name);
+    for (int i = 0; i < file_count; i++) {
+        const char* file_name = file_path_list->file_paths[i];
+        StockDataTable* table = &stock_data_tables->tables[i];
+        table->stock_symbol = extract_symbol(file_name);
         read_stock_csv(
             file_name,
-            row_array,
+            table,
             start_year,
             end_year
         );
     }
 }
 
+int get_all_file_path_recursive_helper(
+    const char* folder,
+    FilePathList* file_path_list,
+    DIR* dir
+) {
+    assert(folder != NULL);
+    assert(file_path_list != NULL);
+    assert(dir != NULL);
+
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL &&
+        file_path_list->file_count < NUMBER_OF_STOCK_EXAMPLES
+    ) {
+        // Get file path
+        char* full_path = nullptr;
+        if (asprintf(&full_path, "%s/%s", folder, entry->d_name) == -1) {
+            perror("Failed to get file path\n");
+            return EXIT_FAILURE;
+        }
+
+        // Only add if a file; not a directory
+        struct stat file_stat;
+        if (stat(full_path, &file_stat) != 0) {
+            perror("Failed to stat file\n");
+            return EXIT_FAILURE;
+        }
+        if (S_ISREG(file_stat.st_mode)) {
+            file_path_list->file_paths[file_path_list->file_count] = full_path;
+            file_path_list->file_count++;
+        } else if (S_ISDIR(file_stat.st_mode) &&
+            strcmp(entry->d_name, ".") != 0 &&
+            strcmp(entry->d_name, "..") != 0
+        ) {
+            // sub_dir must be closed
+            // -----------------------------------------------------------------
+            DIR* sub_dir = opendir(full_path);
+            if (sub_dir == NULL) {
+                perror("Failed to open directory to get all files paths\n");
+                exit(EXIT_FAILURE);
+            }
+            if (get_all_file_path_recursive_helper(
+                    full_path,
+                    file_path_list, sub_dir
+                ) == EXIT_FAILURE
+            ) {
+                // sub_dir closed
+                // -------------------------------------------------------------
+                closedir(sub_dir);
+                return EXIT_FAILURE;
+            }
+            // sub_dir closed
+            // -----------------------------------------------------------------
+            closedir(sub_dir);
+            free(full_path);
+        } else {
+            free(full_path);
+        }
+    }
+    return EXIT_SUCCESS;
+}
 
 /**
- * The caller is responsible
- * for freeing the returned stock data via freeAllStockData.
+ * Gets all absolute file paths for all files in the given folder
+ * and its subfolders.
+ * The caller is responsible for freeing all file paths via freeAllFilesPaths.
  *
+ * @param folder The folder to search for files.
+ * @param file_path_list A pointer to a struct to load the file paths into.
+ */
+void get_all_files_paths_recursive(
+    const char* folder,
+    FilePathList* file_path_list
+) {
+    assert(folder != NULL);
+    assert(file_path_list != NULL);
+
+    // dir must be closed
+    // -------------------------------------------------------------------------
+    DIR* dir = opendir(folder);
+    if (dir == NULL) {
+        perror("Failed to open directory to get all files paths\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // init FilePathList
+    file_path_list->file_paths =
+        malloc(NUMBER_OF_STOCK_EXAMPLES * sizeof(char*));
+    if (file_path_list->file_paths == NULL) {
+        perror("Failed to allocate space for file paths\n");
+        goto error;
+    }
+    file_path_list->file_count = 0;
+
+    if (get_all_file_path_recursive_helper(folder, file_path_list, dir) ==
+        EXIT_FAILURE
+    ) {
+        goto error;
+    }
+    // dir closed
+    // -------------------------------------------------------------------------
+    closedir(dir);
+    return;
+error:
+    closedir(dir);
+    exit(EXIT_FAILURE);
+}
+
+/**
+ * The caller is responsible for freeing the returned stock data
+ * via freeStockDataTables.
+ *
+ * @param stock_data_tables A pointer that will contain a pointer to
+ *                          StockDataTables which will contain stock data
+ *                          for the given timeframe specified by start_year
+ *                          and end_year.
+ * @param start_year The first year, inclusive,
+ *                   of the stock data to be loaded.
+ *                   If null, stock data will be loaded from the beginning.
+ * @param end_year The last year, exclusive,
+ *                 of the stack data to be loaded.
+ *                 If null, stock data will be loaded to the end.
+ * @param folder The folder to get stock data from.
+ *               All subdirectories will be checked for stock data.
  * @return The results of loading the stock data from disk.
  */
 bool load_stock_data_from_disk(
-    AllStockDataArrays** raw_stock_data_array,
-    const u_int16_t* start_year,
-    const u_int16_t* end_year
+    StockDataTables* stock_data_tables,
+    const uint16_t* start_year,
+    const uint16_t* end_year,
+    const char* folder
 ) {
     // filePaths must be freed
     // -------------------------------------------------------------------------
-    FileData file_data;
-    getAllFilesPaths(INTERMEDIATE_DATA_FOLDER, &file_data);
+    FilePathList file_data;
+    get_all_files_paths_recursive(folder, &file_data);
     if (file_data.file_paths == NULL) {
-        fprintf(stderr, "Error: Could not retrieve file paths.\n");
+        perror("Error: Could not retrieve file paths.\n");
         exit(1);
     }
 
-    (*raw_stock_data_array) = malloc(sizeof(AllStockDataArrays));
-    (*raw_stock_data_array)->row_arrays = malloc(
-        file_data.file_count * sizeof(RowArray)
-    );
-    if ((*raw_stock_data_array)->row_arrays == NULL) {
-        perror("malloc failed");
+    // init AllStockDataArrays
+    const size_t file_count = file_data.file_count;
+    stock_data_tables->tables =
+        malloc(file_count * sizeof(StockDataTable));
+    stock_data_tables->table_count = file_count;
+    if (stock_data_tables->tables == NULL) {
+        perror("Failed to allocate stock data tables");
         exit(1);
     }
-    (*raw_stock_data_array)->number_of_raw_stock_data_arrays =
-        file_data.file_count;
 
-    for (int i = 0; i < file_data.file_count; i++) {
-        RowArray* current_row_array = &(*raw_stock_data_array)->row_arrays[i];
-        current_row_array->rows = malloc(
-            LARGEST_STOCK_DATASET_SIZE * sizeof(Row)
-        );
-        current_row_array->data_size = LARGEST_STOCK_DATASET_SIZE;
-        if (current_row_array->rows == NULL) {
-            perror("malloc failed");
+    // Create space for the stock data
+    for (int i = 0; i < file_count; i++) {
+        StockDataTable* current_table = &stock_data_tables->tables[i];
+        current_table->rows =
+            malloc(LARGEST_STOCK_DATASET_SIZE * sizeof(StockDataRow));
+        current_table->row_count = LARGEST_STOCK_DATASET_SIZE;
+        if (current_table->rows == NULL) {
+            perror("Failed to allocate stock data rows");
             exit(1);
         }
     }
 
-    load_raw_stock_data(
+    load_stock_data_from_files(
         &file_data,
-        *raw_stock_data_array,
+        stock_data_tables,
         start_year,
         end_year
     );
 
-    freeAllFilesPaths(&file_data);
     // filePaths freed
     // -------------------------------------------------------------------------
+    freeAllFilesPaths(&file_data);
     return true;
-}
-
-void freeAllStockData(AllStockDataArrays* raw_stock_data_array) {
-    for (
-        int i = 0;
-        i < raw_stock_data_array->number_of_raw_stock_data_arrays;
-        i++
-    ) {
-        free(raw_stock_data_array->row_arrays[i].rows);
-        free(raw_stock_data_array->row_arrays[i].stock_symbol);
-    }
-    free(raw_stock_data_array->row_arrays);
-    free(raw_stock_data_array);
 }

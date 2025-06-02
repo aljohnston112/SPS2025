@@ -9,7 +9,12 @@ else ()
     set(CMAKE_CXX_COMPILER "clang++")
 endif ()
 set(COMMON_COMPILE_FLAGS -msse4.2 -g -fno-omit-frame-pointer -Wall)
-set(COMMON_LINK_FLAGS "")
+set(COMMON_LINK_FLAGS)
+
+set(ENABLE_COVERAGE true)
+if(ENABLE_COVERAGE)
+    list(APPEND COMMON_COMPILE_FLAGS --coverage)
+endif()
 
 project(SPS2025 C CXX)
 
@@ -43,6 +48,7 @@ set(
         C/directions.c
         C/tree.c
         C/ranks.c
+        C/sequence_analyzer.c
 )
 
 set(
@@ -58,6 +64,7 @@ set(
         C/config.h
         C/tree.h
         C/ranks.h
+        C/sequence_analyzer.h
 )
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development NumPy)
@@ -103,6 +110,77 @@ if (PARALLEL)
     target_link_libraries(SPS2025 PRIVATE m OpenMP::OpenMP_C)
 endif ()
 target_link_libraries(SPS2025 PRIVATE ${Python3_LIBRARIES})
+
+if(ENABLE_COVERAGE)
+    target_link_libraries(SPS2025 PRIVATE gcov)
+endif ()
+
+set(
+        C_TEST_HEADER_FILES
+        C_tests/file_util_test.h
+        C_tests/csv_util_test.h
+        C_tests/test_data.h
+        C_tests/ranks_test.h
+        C_tests/tree_test.h
+)
+
+set(
+        C_TEST_SOURCE_FILES
+        C_tests/main.c
+        C_tests/file_util_test.c
+        C_tests/csv_util_test.c
+        C_tests/ranks_test.c
+        C_tests/tree_test.c
+)
+
+add_executable(
+        SPS2025Test
+        ${C_HEADER_FILES}
+        ${CXX_HEADER_FILES}
+        ${C_TEST_HEADER_FILES}
+        ${C_SOURCE_FILES}
+        ${CXX_SOURCE_FILES}
+        ${C_TEST_SOURCE_FILES}
+)
+set_target_properties(SPS2025Test PROPERTIES LINKER_LANGUAGE C)
+
+target_include_directories(
+        SPS2025Test PRIVATE
+        external/matplotlib-cpp
+        ${Python3_INCLUDE_DIRS}
+        ${Python3_NumPy_INCLUDE_DIRS}
+)
+target_link_libraries(SPS2025Test PRIVATE ${Python3_LIBRARIES})
+
+if (PARALLEL)
+    target_link_libraries(SPS2025Test PRIVATE m OpenMP::OpenMP_C)
+endif ()
+file(COPY C_tests/test_data DESTINATION ${CMAKE_BINARY_DIR})
+
+if(ENABLE_COVERAGE)
+    target_link_libraries(SPS2025Test PRIVATE gcov)
+
+    find_program(LCOV_EXEC lcov)
+    find_program(GENHTML_EXEC genhtml)
+
+    add_custom_target(
+            coverage_clean
+            COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/*.info
+            COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/coverage_html
+    )
+
+    add_custom_target(
+            coverage
+            DEPENDS coverage_clean
+            DEPENDS SPS2025Test
+            COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_BINARY_DIR} ./SPS2025Test
+            COMMAND ${LCOV_EXEC} --directory ${CMAKE_BINARY_DIR} --capture --output-file coverage.info
+            COMMAND ${LCOV_EXEC} --remove coverage.info '/usr/*' --output-file coverage_filtered.info --ignore-errors unused
+            COMMAND ${GENHTML_EXEC} coverage_filtered.info --output-directory coverage_html
+            COMMAND xdg-open coverage_html/index.html
+            COMMENT "Generating and opening coverage report..."
+    )
+endif()
 
 add_library(
         array_to_python SHARED

@@ -4,57 +4,37 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-/**
- *
- * @param map
- * @param past_sequence The sequence must start with a positive number
- * @param sequence_length
- * @return -1 if the sequence was not found
- *            or there is no sequence in the tree
- *            with a length 1 greater than the given sequence length.
- *            Otherwise, a predicted number of days the next sequence will last.
- */
+#include "config.h"
+#include "ranks.h"
+
 void get_prediction_from_hash_map_helper(
     const TreeHashMap* map,
     const long* past_sequence,
     const size_t sequence_length,
-    double* prediction
+    double* prediction,
+    size_t* depth
 ) {
     assert(prediction != NULL);
 
     const TreeHashMap* current_map = map;
     for (size_t i = 0; i < sequence_length; i++) {
-        assert(past_sequence[i] != 0);
         current_map = get_from_tree_hash_map(current_map, past_sequence[i]);
         if (current_map == NULL) {
             *prediction = 0.0;
             return;
         }
+        (*depth)++;
     }
 
-    // TODO add total count to each node if tests are promising
-    u_int64_t total_count = 0;
-    for (size_t i = 0; i < current_map->size; i++) {
-        const TreeHashMap* child = current_map->map[i];
-        if (child != NULL) {
-            const u_int64_t old_total_count = total_count;
-            total_count += child->count;
-            if (__glibc_unlikely(total_count <= old_total_count)) {
-                perror("Overflow");
-                exit(1);
-            }
-        }
-    }
-
-    *prediction = 0.0;
-    for (size_t i = 0; i < current_map->size; i++) {
-        const TreeHashMap* child = current_map->map[i];
-        if (child != NULL) {
-            const double p = (double)child->key * ((double)child->count / (
-                double)total_count);
-            *prediction += p;
-        }
+    const u_int64_t count_up = current_map->count_up;
+    const u_int64_t count_down = current_map->count_down;
+    const u_int64_t total_count = count_down + count_up;
+    if (count_up > count_down) {
+        *prediction = (double)count_up / (double)total_count;
+    } else {
+        *prediction = -((double)count_down / (double)total_count);
     }
 }
 
@@ -62,23 +42,341 @@ void get_prediction_from_hash_map(
     const TreeHashMap* map,
     const long* past_sequence,
     const size_t sequence_length,
-    double* prediction
+    double* prediction,
+    size_t* depth
 ) {
-    for (size_t i = 0; i < sequence_length; i += 2) {
+    for (size_t i = sequence_length; i > 0; i--) {
+        size_t d = 0;
         double p;
         get_prediction_from_hash_map_helper(
             map,
-            past_sequence + i,
-            sequence_length - i,
-            &p
+            past_sequence + (sequence_length - i),
+            i,
+            &p,
+            &d
         );
         if (p != 0.0) {
             *prediction = p;
+            *depth = d;
+            break;
         }
     }
 }
 
+void print_tree_helper(const TreeHashMap* node, const int current_depth) {
+    constexpr int min_depth = 1;
+    constexpr int max_depth = 10000; // min_depth + 1;
+    if (node == NULL || current_depth > max_depth) return;
 
+    size_t i = 0;
+    while (i < node->size) {
+        const TreeHashMap* child = node->map[i];
+        if (child != NULL) {
+            if (current_depth >= min_depth &&
+                child->count_down < child->count_up &&
+                child->count_up > 9 &&
+                (double)child->count_up / (double)child->count_down > 2
+            ) {
+                printf(
+                    "Depth %d: %ld (Up: %lu)(Down: %lu)\n",
+                    current_depth,
+                    child->key,
+                    child->count_up,
+                    child->count_down
+                );
+            }
+            print_tree_helper(child, current_depth + 1);
+        }
+        i++;
+    }
+}
+
+void print_tree(const TreeHashMap* root) {
+    if (root == NULL) {
+        printf("(empty tree)\n");
+        return;
+    }
+
+    printf("Tree structure:\n");
+    print_tree_helper(root, 1);
+}
+
+typedef struct {
+    const TreeHashMap* node;
+    int row_index;
+    int depth;
+} QueueItem;
+
+void export_tree_to_csv(const TreeHashMap* root, FILE* out) {
+    if (!root || !out) return;
+
+    int front = 0;
+    int back = 0;
+    int next_row = 0;
+
+    constexpr int MAX_NODES = 100000; // adjust if needed
+    QueueItem queue[MAX_NODES];
+    queue[back++] = (QueueItem){
+        .node = root,
+        .row_index = next_row,
+        .depth = 0
+    };
+
+    const TreeHashMap* node_index_map[MAX_NODES];
+    node_index_map[next_row++] = root;
+
+    // Precalculate max children across all nodes
+    size_t max_children = 0;
+    while (front < back) {
+        const TreeHashMap* node = queue[front++].node;
+        size_t child_count = 0;
+        for (size_t i = 0; i < node->size; ++i) {
+            if (node->map[i]) {
+                ++child_count;
+            }
+        }
+        if (child_count > max_children) {
+            max_children = child_count;
+        }
+
+        for (size_t i = 0; i < node->size; ++i) {
+            const TreeHashMap* child = node->map[i];
+            if (child) {
+                queue[back++] = (QueueItem){
+                    .node = child,
+                    .row_index = next_row,
+                    .depth = queue[front - 1].depth + 1
+                };
+                node_index_map[next_row++] = child;
+            }
+        }
+    }
+
+    // Write CSV header
+    fprintf(out, "Depth,Key,Up,Down");
+
+    for (size_t i = 0; i < max_children; ++i) {
+        fprintf(out, ",C%zu", i);
+    }
+    fprintf(out, "\n");
+
+    // Output all rows in order
+    for (int i = 0; i < next_row; ++i) {
+        const TreeHashMap* node = node_index_map[i];
+        const int depth = queue[i].depth;
+
+        fprintf(
+            out,
+            "%d,%ld,%lu,%lu",
+            depth,
+            node->key,
+            node->count_up,
+            node->count_down
+        );
+
+        // Write child indices
+        size_t written = 0;
+        for (size_t j = 0; j < node->size; ++j) {
+            const TreeHashMap* child = node->map[j];
+            if (child) {
+                for (int k = 0; k < next_row; ++k) {
+                    if (node_index_map[k] == child) {
+                        fprintf(out, ",%d", k);
+                        break;
+                    }
+                }
+                written++;
+            }
+        }
+        while (written++ < max_children) {
+            fprintf(out, ",-1");
+        }
+
+        fprintf(out, "\n");
+    }
+}
+
+void free_tree_helper(TreeHashMap* node) {
+    if (node == NULL) {
+        return;
+    }
+
+    size_t i = 0;
+    while (i < node->size) {
+        TreeHashMap* child = node->map[i];
+        if (child != NULL) {
+            free_tree_helper(child);
+        }
+        i++;
+    }
+    free(node->map);
+    free(node);
+}
+
+void free_tree(TreeHashMap* root) {
+    if (root == NULL) {
+        return;
+    }
+    free_tree_helper(root);
+}
+
+
+
+
+TreeHashMap* get_from_tree_hash_map(const TreeHashMap* map, const long key) {
+    assert(map);
+    TreeHashMap** children = map->map;
+    const size_t number_of_children = map->size;
+    if (children == NULL) {
+        return nullptr;
+    }
+    assert(number_of_children > 0);
+
+    size_t i = 0;
+    while (true) {
+        const size_t index = (key + (i * i)) % number_of_children;
+        TreeHashMap* child = children[index];
+        if (child == NULL) {
+            return nullptr;
+        }
+        if (child->key == key) {
+            return child;
+        }
+        i++;
+    }
+}
+
+bool is_prime(const size_t value) {
+    assert(value > 0);
+    size_t i = 0;
+    while (primes[i] != 0 && value > primes[i]) {
+        i++;
+    }
+    return value == primes[i];
+}
+
+void resize_hash_map(TreeHashMap* map) {
+    assert(map);
+    assert(map->map);
+    assert(map->size > 0);
+
+    // Get the first prime number over twice as large as the current size
+    size_t newSize = 2 * map->size + 1;
+    while (!is_prime(newSize)) {
+        newSize += 2;
+    }
+    const size_t old_size = map->size;
+    TreeHashMap** old_map = map->map;
+    map->map = calloc(sizeof(TreeHashMap*), newSize);
+    map->size = newSize;
+    map->current_size = 0;
+    for (int i = 0; i < old_size; i++) {
+        if (old_map[i] != NULL) {
+            TreeHashMap* old_child = old_map[i];
+            int j = 0;
+            // slot is occupied
+            while (map->map[(old_child->key + (j * j)) % map->size] != NULL) {
+                j++;
+            }
+            // found a spot to put the key, put it in the map
+            const size_t index = (old_child->key + (j * j)) % map->size;
+
+            map->map[index] = old_child;
+            map->current_size++;
+        }
+    }
+
+    free(old_map);
+}
+
+TreeHashMap* add_to_hash_map_or_get(TreeHashMap* map, const long key) {
+    u_int64_t map_size = map->size;
+    if (__glibc_unlikely(map->current_size * 2 >= map_size)) {
+        // printf("Resize #: %ld\n", ++resizes);
+        resize_hash_map(map);
+        map_size = map->size;
+    }
+
+    TreeHashMap* child = get_from_tree_hash_map(map, key);
+    if (child != NULL) {
+        return child;
+    }
+
+    size_t i = 0;
+    // slot is occupied
+    while (map->map[(key + (i * i)) % map_size] != NULL) {
+        i++;
+    }
+    // found a spot to put the key, put it in the map
+    const size_t index = (key + (i * i)) % map_size;
+
+    child = create_tree_hash_map(key);
+    map->map[index] = child;
+    map->current_size++;
+    return child;
+}
+
+void add_subsequence(
+    TreeHashMap* parent,
+    const long* sequence,
+    const size_t sequence_length,
+    const bool went_up
+) {
+    TreeHashMap* current = parent;
+    for (size_t i = 0; i < sequence_length; i++) {
+        const long key = sequence[i];
+        TreeHashMap* child = add_to_hash_map_or_get(current, key);
+        current = child;
+    }
+
+    const uint64_t past_count_up = current->count_up;
+    const uint64_t past_count_down = current->count_down;
+    if (went_up) {
+        current->count_up++;
+    } else {
+        current->count_down++;
+    }
+    if (__glibc_unlikely(current->count_down < past_count_down)) {
+        perror("Overflow");
+        exit(1);
+    }
+    if (__glibc_unlikely(current->count_up < past_count_up)) {
+        perror("Overflow");
+        exit(1);
+    }
+}
+
+void add_sequence(
+    TreeHashMap* root,
+    const long* sequence,
+    const size_t sequence_length,
+    const bool* went_up,
+    const size_t window_size
+) {
+    size_t length = sequence_length;
+    if (length > window_size) {
+        length = window_size;
+    }
+    for (size_t i = 0; i < length; i++) {
+        add_subsequence(
+            root,
+            sequence,
+            length - i,
+            went_up[length - i - 1]
+        );
+    }
+}
+
+/**
+ * Creates the root of a sequence counting tree.
+ * The returned tree must be freed by the caller.
+ *
+ * @param key The key of the root.
+ *            This key is skipped over when sequences are added.
+ *            This key is also skipped over when making predictions.
+ *
+ * @return The root of the tree.
+ */
 TreeHashMap* create_tree_hash_map(const long key) {
     TreeHashMap* map = malloc(sizeof(TreeHashMap));
     if (map == NULL) {
@@ -93,214 +391,7 @@ TreeHashMap* create_tree_hash_map(const long key) {
     map->size = START_MAP_SIZE;
     map->current_size = 0;
     map->key = key;
-    map->count = 0;
+    map->count_down = 0;
+    map->count_up = 0;
     return map;
-}
-
-bool isPrime(const size_t value) {
-    assert(value > 0);
-    size_t i = 0;
-    while (primes[i] != 0 && value > primes[i]) {
-        i++;
-    }
-    return value == primes[i];
-}
-
-size_t getFirstPrimeEqualOrLess(const size_t n) {
-    size_t low = 0;
-    size_t high = sizeof(primes) / sizeof(primes[0]) - 1;
-    while (low <= high) {
-        const size_t mid = low + (high - low) / 2;
-        if (primes[mid] == n) {
-            return n;
-        }
-        if (primes[mid] < n) {
-            low = mid + 1;
-        } else {
-            high = mid - 1;
-        }
-    }
-    return primes[high];
-}
-
-TreeHashMap* get_from_tree_hash_map(const TreeHashMap* map, const long key) {
-    assert(map);
-    if (map->map == NULL) {
-        return NULL;
-    }
-    assert(map->size > 0);
-
-    size_t hash_multiplier = 0;
-    const long actual_key = key < 0 ? -key : key;
-    while (true) {
-        const size_t i =
-            (actual_key + (hash_multiplier * hash_multiplier)) % map->size;
-        if (map->map[i] == NULL) {
-            break;
-        }
-        if (map->map[i]->key == key) {
-            return map->map[i];
-        }
-        hash_multiplier++;
-    }
-    return NULL;
-}
-
-void resize_hash_map(TreeHashMap* map);
-
-u_int64_t resizes = 0;
-
-TreeHashMap* add_to_hash_map(TreeHashMap* map, const long key) {
-    u_int64_t map_size = map->size;
-    if (__glibc_unlikely(map->current_size * 2 >= map_size)) {
-        printf("Resize #: %ld\n", ++resizes);
-        resize_hash_map(map);
-        map_size = map->size;
-    }
-
-    TreeHashMap* child = get_from_tree_hash_map(map, key);
-    if (child != NULL) {
-        return child;
-    }
-
-    size_t i = 0;
-    const long actual_key = key < 0 ? -key : key;
-    assert(key != 0);
-    // slot is occupied
-    while (map->map[(actual_key + (i * i)) % map_size] != NULL) {
-        i++;
-    }
-    // found a spot to put the key, put it in the map
-    const size_t index = (actual_key + (i * i)) % map_size;
-
-    child = create_tree_hash_map(key);
-    map->map[index] = child;
-    map->current_size++;
-    return child;
-}
-
-void resize_hash_map(TreeHashMap* map) {
-    assert(map);
-    assert(map->map);
-    assert(map->size > 0);
-
-    // Get the first prime number over twice as large as the current size
-    size_t newSize = 2 * map->size + 1;
-    while (!isPrime(newSize)) {
-        newSize += 2;
-    }
-    const size_t old_size = map->size;
-    const size_t old_count = map->count;
-    TreeHashMap** old_map = map->map;
-    map->map = calloc(sizeof(TreeHashMap*), newSize);
-    map->size = newSize;
-    map->current_size = 0;
-    map->count = old_count;
-
-    const size_t prime = getFirstPrimeEqualOrLess(map->size);
-    for (int i = 0; i < old_size; i++) {
-        if (old_map[i] != NULL) {
-            TreeHashMap* value = old_map[i];
-            int j = 0;
-            const long actual_key = value->key < 0 ? -value->key : value->key;
-            const size_t secondaryHashFunction = prime - (actual_key % prime);
-            // slot is occupied
-            while (map->map[(actual_key + j * secondaryHashFunction) % map->
-                size] != NULL) {
-                j++;
-            }
-            // found a spot to put the key, put it in the map
-            const size_t index = (actual_key + j * secondaryHashFunction) % map
-                ->size;
-
-            map->map[index] = value;
-            map->current_size++;
-        }
-    }
-
-    free(old_map);
-}
-
-void add_subsequence(
-    TreeHashMap* parent,
-    const long* sequence,
-    const size_t sequence_length
-) {
-    TreeHashMap* current = parent;
-    for (size_t i = 0; i < sequence_length; i++) {
-        const long key = sequence[i];
-        TreeHashMap* child = add_to_hash_map(current, key);
-        current = child;
-    }
-    current->count++;
-    if (__glibc_unlikely(current->count == 0)) {
-        perror("Overflow");
-        exit(1);
-    }
-}
-
-void add_sequence(
-    TreeHashMap* parent,
-    const long* sequence,
-    const size_t sequence_length
-) {
-    for (size_t i = 0; i < sequence_length; i++) {
-        for (size_t j = i + 1; j <= sequence_length; j++) {
-            const long first = *(sequence + i);
-            if (first > 0) {
-                add_subsequence(
-                    parent,
-                    sequence + i,
-                    j - i
-                );
-            } else {
-                TreeHashMap* child = get_from_tree_hash_map(parent, *(sequence + i - i));
-                if (child != NULL) {
-                    add_subsequence(
-                        child,
-                        sequence + i,
-                        j - i
-                    );
-                } else {
-                    add_subsequence(
-                        add_to_hash_map(parent, *(sequence + i - i)),
-                        sequence + i,
-                        j - i
-                    );
-                }
-            }
-        }
-    }
-}
-
-void print_tree_helper(const TreeHashMap* node, const int current_depth) {
-    if (node == NULL) return;
-
-    if (current_depth < 40) {
-        size_t i = 0;
-        while (i < node->size) {
-            const TreeHashMap* child = node->map[i];
-            if (child != NULL) {
-                printf(
-                    "Depth %d: %ld (%s: %lu)\n",
-                    current_depth,
-                    child->key,
-                    current_depth % 2 == 0 ? "loss" : "profit",
-                    child->count
-                );
-                print_tree_helper(child, current_depth + 1);
-            }
-            i++;
-        }
-    }
-}
-
-void print_tree(const TreeHashMap* root) {
-    if (root == NULL) {
-        printf("(empty tree)\n");
-        return;
-    }
-
-    printf("Tree structure:\n");
-    print_tree_helper(root, 1);
 }

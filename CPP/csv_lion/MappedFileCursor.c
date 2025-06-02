@@ -45,6 +45,11 @@ int mapped_file_cursor_map_file(MappedFileCursor* self, const char* filename) {
         return errno;
     }
 
+    if (st.st_size == 0) {
+        close(fd);
+        return -1;
+    }
+
     const unsigned long page_size = get_page_size();
     const unsigned long page_mask = page_size - 1;
     const size_t rounded = (st.st_size + page_mask) & ~page_mask;

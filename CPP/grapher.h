@@ -8,9 +8,7 @@ extern "C" {
 #else
 #endif
 
-void convert_and_plot(
-    const AllStockRanks* all
-);
+void convert_and_plot(SymbolToRanksHashMap* all);
 
 #ifdef __cplusplus
 }

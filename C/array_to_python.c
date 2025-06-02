@@ -2,7 +2,7 @@
 
 AllStockDataContainer* load_stock_data() {
 
-    AllStockDataArrays* raw_stock_data_array;
+    StockDataTables* raw_stock_data_array;
     bool success = load_stock_data_from_disk(&raw_stock_data_array);
     if (!success) {
         return nullptr;
@@ -11,7 +11,7 @@ AllStockDataContainer* load_stock_data() {
     AllDirectionDataArrays* all_direction_data;
     success = getDirectionData(&raw_stock_data_array, &all_direction_data);
     if (!success) {
-        freeAllStockData(raw_stock_data_array);
+        free_stock_data_tables(raw_stock_data_array);
         return nullptr;
     }
 
@@ -19,7 +19,7 @@ AllStockDataContainer* load_stock_data() {
     success = calculateDirectionCounts(&all_direction_data, &all_direction_counts);
     if (!success) {
         freeDirectionData(all_direction_data);
-        freeAllStockData(raw_stock_data_array);
+        free_stock_data_tables(raw_stock_data_array);
         return nullptr;
     }
 
@@ -34,6 +34,6 @@ AllStockDataContainer* load_stock_data() {
 void free_stock_data(AllStockDataContainer* stock_data_array) {
     freeDirectionCounts(stock_data_array->direction_counts);
     freeDirectionData(stock_data_array->directions);
-    freeAllStockData(stock_data_array->raw_stock_data);
+    free_stock_data_tables(stock_data_array->raw_stock_data);
     free(stock_data_array);
 }
