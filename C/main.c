@@ -23,10 +23,10 @@ void printOpenMPVersion() {
 #endif
 
 constexpr uint16_t past_end_year = 2018;
-constexpr uint16_t past_start_year = past_end_year - 4;
+constexpr uint16_t past_start_year = past_end_year - 5;
 
 constexpr u_int16_t future_start_year = past_end_year;
-constexpr u_int16_t future_end_year = future_start_year + 4;
+constexpr u_int16_t future_end_year = future_start_year + 1;
 
 void print_promising_stocks(
     const TreeHashMap* yearly_tree,
@@ -259,7 +259,7 @@ void run_backtest(
     const SymbolToRanksHashMap* all_stock_ranks
 ) {
     // Start with $1
-    double capital = 1.0;
+    double capital = 1000.0;
 
     // Track how many trades happen and how many profit
     size_t total_trades = 0;
@@ -267,7 +267,11 @@ void run_backtest(
 
     // Track open trades
     OpenTrade* open_trades =
-        malloc(NUMBER_OF_STOCK_EXAMPLES * NUMBER_OF_STOCK_EXAMPLES * sizeof(OpenTrade));
+        malloc(
+            NUMBER_OF_STOCK_EXAMPLES *
+            NUMBER_OF_STOCK_EXAMPLES *
+            sizeof(OpenTrade)
+        );
     size_t num_open_trades = 0;
 
     // Find the stock with the max number of data points
@@ -291,7 +295,6 @@ void run_backtest(
     ) {
         // Go through all stocks
         for (size_t j = 0; j < all_stock_ranks->count; j++) {
-
             // This is future data
             const StockRanks* stock_ranks =
                 all_stock_ranks->symbol_to_ranks[j];
@@ -301,7 +304,7 @@ void run_backtest(
                 // Go through every day in the data minus room to check for a sale
 
                 // Bail out if we decided to bail earlier
-                if (bailed[j] && bail_days[j] != 0 &&  bail_days[j] <= i) {
+                if (bailed[j] && bail_days[j] != 0 && bail_days[j] <= i) {
                     continue;
                 }
 
@@ -368,11 +371,10 @@ void run_backtest(
                 ) {
                     // Only consider stocks under $20
                     const double buy_price = stock_ranks->high_per_day[i + 1];
-                    if (buy_price < 10) {
+                    if (buy_price < 1) {
                         // Assume default sell date
                         uint64_t sell_day = 1 + i + BUY_SELL_LAG;
-                        double sell_price =
-                            stock_ranks->low_per_day[sell_day];
+                        double sell_price = -1.0;
 
                         // But see if we can sell earlier for 50% profit,
                         // hold until 50% profit
@@ -389,6 +391,10 @@ void run_backtest(
                                 sell_day = day;
                                 break;
                             }
+                        }
+
+                        if (sell_price == -1.0) {
+                            sell_price = 0;
                         }
 
                         // For tracking how many trades were a profit
@@ -428,7 +434,10 @@ void run_backtest(
     free(open_trades);
 
     printf(
-        "Backtest finished. \n    Total trades: %zu, \n    Capital: %.2f\n    Percent of trades that resulted in profit: %.2f\n",
+        "Backtest finished. \n"
+        "    Total trades: %zu, \n"
+        "    Capital: %.2f\n"
+        "    Percent of trades that resulted in profit: %.2f\n",
         total_trades,
         capital,
         (double)n_profit / (double)total_trades
