@@ -9,7 +9,7 @@
 #include "config.h"
 #include "file_util.h"
 
-void free_symbol_to_ranks_hash_map(const SymbolToRanksHashMap* ranks) {
+void free_symbol_to_ranks_hash_map(SymbolToRanksHashMap* ranks) {
     for (size_t i = 0; i < RANK_MAP_SIZE; ++i) {
         StockRanks* sr = ranks->symbol_to_ranks[i];
         if (sr) {
@@ -22,6 +22,7 @@ void free_symbol_to_ranks_hash_map(const SymbolToRanksHashMap* ranks) {
             free(sr);
         }
     }
+    free(ranks);
 }
 
 /**
@@ -365,7 +366,7 @@ void rank_valid_stocks_by_low(
 
         // Store ranks for today
         for (
-            int64_t active_index = 0;
+            uint32_t active_index = 0;
             active_index < active_count;
             active_index++
         ) {
@@ -377,8 +378,9 @@ void rank_valid_stocks_by_low(
             );
             assert(stock_rank != NULL);
             const size_t current_rank_index = stock_rank->current_index;
-            assert(current_rank_index < stock_rank->data_size);
             const StockDataRow* row = &table->rows[active_stock->current_index];
+
+            assert(current_rank_index < stock_rank->data_size);
             if (row->date.year != 0) {
                 stock_rank->rank_per_day[current_rank_index] = active_index;
                 stock_rank->low_per_day[current_rank_index] = row->low;
@@ -520,6 +522,7 @@ void initialize_symbol_to_ranks_hash_map(
     SymbolToRanksHashMap* symbol_to_ranks_hash_map
 ) {
     symbol_to_ranks_hash_map->count = 0;
+    memset(symbol_to_ranks_hash_map->symbol_to_ranks, 0, sizeof(symbol_to_ranks_hash_map->symbol_to_ranks));
 
     // * 2 to fill in missing days; i.e. weekends or unreported days
     constexpr size_t number_of_rows = LARGEST_STOCK_DATASET_SIZE * 2;

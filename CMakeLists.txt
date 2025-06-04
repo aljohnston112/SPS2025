@@ -4,11 +4,28 @@ set(USE_GCC TRUE)
 if (USE_GCC)
     set(CMAKE_C_COMPILER "gcc")
     set(CMAKE_CXX_COMPILER "g++")
+    set(COMMON_COMPILE_FLAGS
+            -msse4.2
+            -g
+            -fno-omit-frame-pointer
+            -Wall
+            -Wextra
+            -Wpedantic
+            -Wstack-usage=8192
+    )
 else ()
     set(CMAKE_C_COMPILER "clang")
     set(CMAKE_CXX_COMPILER "clang++")
+    set(COMMON_COMPILE_FLAGS
+            -msse4.2
+            -g
+            -fno-omit-frame-pointer
+            -Wall
+            -Wextra
+            -Wpedantic
+    )
 endif ()
-set(COMMON_COMPILE_FLAGS -msse4.2 -g -fno-omit-frame-pointer -Wall)
+
 set(COMMON_LINK_FLAGS)
 
 set(ENABLE_COVERAGE true)
@@ -70,9 +87,6 @@ set(
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development NumPy)
 if (PARALLEL)
     find_package(OpenMP REQUIRED)
-    if (NOT USE_GCC)
-        list(APPEND COMMON_LINK_FLAGS -fopenmp=libomp)
-    endif ()
     list(APPEND COMMON_COMPILE_FLAGS -fopenmp)
 endif ()
 

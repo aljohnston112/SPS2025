@@ -23,6 +23,7 @@ void read_stock_csv(
 ) {
     MappedFileCursor file_cursor;
     if (mapped_file_cursor_map_file(&file_cursor, filename) != 0) {
+        table->row_count = 0;
         return;
     }
 
@@ -44,6 +45,11 @@ void read_stock_csv(
             const char* date = dateCell->ptr;
             u_int16_t year;
             extract_uint16_t(date, date + 4, &year);
+
+            if(end_year != NULL && year > *end_year) {
+                data_index--;
+                break;
+            }
             if (year >= *start_year) {
                 StockDataRow* current_row = &table->rows[0];
 

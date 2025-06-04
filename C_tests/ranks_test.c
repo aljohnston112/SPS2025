@@ -10,32 +10,32 @@
 
 void
 rank_stocks_by_low_with_different_sized_inputs_fills_rank_diffs_and_went_up_correctly() {
-    SymbolToRanksHashMap map = {
-        .count = 0
-    };
+    SymbolToRanksHashMap* map = malloc(sizeof(SymbolToRanksHashMap));
+    assert(map != NULL);
+    map->count = 0;
 
     // Stock a
     StockDataRow rows_for_a[] = {
-        {{2023, 1, 2}, 9, 16, 14},
-        {{2023, 1, 4}, 13, 18, 13},
-        {{2023, 1, 5}, 14, 22, 21},
-        {{2023, 1, 6}, 9, 19, 16},
-        {{2023, 1, 7}, 13, 18, 13},
-        {{2023, 1, 8}, 14, 22, 21},
-        {{2023, 1, 9}, 9, 23, 22}
+        {{2023, 1, 2}, 9, 16, 14, 9, 100},
+        {{2023, 1, 4}, 13, 18, 13, 13, 100},
+        {{2023, 1, 5}, 14, 22, 21, 14, 100},
+        {{2023, 1, 6}, 9, 19, 16, 9, 100},
+        {{2023, 1, 7}, 13, 18, 13, 13, 100},
+        {{2023, 1, 8}, 14, 22, 21, 14, 100},
+        {{2023, 1, 9}, 9, 23, 22, 9, 100}
     };
     const StockDataTable table_for_a = {"a", rows_for_a, 7};
 
     // Stock c
     StockDataRow rows_for_b[] = {
-        {{2023, 1, 1}, 10, 15, 14},
-        {{2023, 1, 2}, 12, 16, 13},
-        {{2023, 1, 3}, 11, 14, 12},
-        {{2023, 1, 4}, 9, 21, 20},
-        {{2023, 1, 5}, 10, 15, 14},
-        {{2023, 1, 6}, 12, 18, 17},
-        {{2023, 1, 7}, 11, 14, 12},
-        {{2023, 1, 8}, 9, 21, 20}
+        {{2023, 1, 1}, 10, 15, 14, 10, 100},
+        {{2023, 1, 2}, 12, 16, 13, 12, 100},
+        {{2023, 1, 3}, 11, 14, 12, 11, 100},
+        {{2023, 1, 4}, 9, 21, 20, 9, 100},
+        {{2023, 1, 5}, 10, 15, 14, 10, 100},
+        {{2023, 1, 6}, 12, 18, 17, 12, 100},
+        {{2023, 1, 7}, 11, 14, 12, 11, 100},
+        {{2023, 1, 8}, 9, 21, 20, 9, 100}
     };
 
     const StockDataTable table_for_b = {"b", rows_for_b, 8};
@@ -44,13 +44,13 @@ rank_stocks_by_low_with_different_sized_inputs_fills_rank_diffs_and_went_up_corr
         .tables = (StockDataTable[]){table_for_a, table_for_b},
         .table_count = 2
     };
-    initialize_symbol_to_ranks_hash_map(&stock_tables, &map);
-    rank_stocks_by_low(&stock_tables, &map, 2, 3);
+    initialize_symbol_to_ranks_hash_map(&stock_tables, map);
+    rank_stocks_by_low(&stock_tables, map, 2, 3);
 
     const StockRanks* ranks_for_a =
-        get_from_ranks_hash_map(&map, table_for_a.stock_symbol);
+        get_from_ranks_hash_map(map, table_for_a.stock_symbol);
     const StockRanks* ranks_for_b =
-        get_from_ranks_hash_map(&map, table_for_b.stock_symbol);
+        get_from_ranks_hash_map(map, table_for_b.stock_symbol);
 
     // first two rows did not have previous data for the diff
     for (size_t i = 0; i < 2 ; i++) {
@@ -107,38 +107,38 @@ rank_stocks_by_low_with_different_sized_inputs_fills_rank_diffs_and_went_up_corr
     assert(ranks_for_a->data_size == 8);
     assert(ranks_for_b->data_size == 9);
 
-    free_symbol_to_ranks_hash_map(&map);
+    free_symbol_to_ranks_hash_map(map);
 }
 
 
 void
 create_rank_diffs_with_different_sized_inputs_fills_rank_diffs_and_went_up_correctly() {
-    SymbolToRanksHashMap map = {
-        .count = 0
-    };
+    SymbolToRanksHashMap* map = malloc(sizeof(SymbolToRanksHashMap));
+    assert(map != NULL);
+    map->count = 0;
 
     // Stock a
     StockDataRow rows_for_a[] = {
-        {{2023, 1, 2}, 9, 16, 14},
-        {{2023, 1, 4}, 13, 18, 13},
-        {{2023, 1, 5}, 14, 22, 21},
-        {{2023, 1, 6}, 9, 19, 16},
-        {{2023, 1, 7}, 13, 18, 13},
-        {{2023, 1, 8}, 14, 22, 21},
-        {{2023, 1, 9}, 9, 23, 22}
+        {{2023, 1, 2}, 9, 16, 14, 9, 100},
+        {{2023, 1, 4}, 13, 18, 13, 13, 100},
+        {{2023, 1, 5}, 14, 22, 21, 14, 100},
+        {{2023, 1, 6}, 9, 19, 16, 9, 100},
+        {{2023, 1, 7}, 13, 18, 13, 13, 100},
+        {{2023, 1, 8}, 14, 22, 21, 14, 100},
+        {{2023, 1, 9}, 9, 23, 22, 9, 100}
     };
     const StockDataTable table_for_a = {"a", rows_for_a, 7};
 
     // Stock b
     StockDataRow rows_for_b[] = {
-        {{2023, 1, 1}, 10, 15, 14},
-        {{2023, 1, 2}, 12, 16, 13},
-        {{2023, 1, 3}, 11, 14, 12},
-        {{2023, 1, 4}, 9, 21, 20},
-        {{2023, 1, 5}, 10, 15, 14},
-        {{2023, 1, 6}, 12, 18, 17},
-        {{2023, 1, 7}, 11, 14, 12},
-        {{2023, 1, 8}, 9, 21, 20}
+        {{2023, 1, 1}, 10, 15, 14, 10, 100},
+        {{2023, 1, 2}, 12, 16, 13, 12, 100},
+        {{2023, 1, 3}, 11, 14, 12, 11, 100},
+        {{2023, 1, 4}, 9, 21, 20, 9, 100},
+        {{2023, 1, 5}, 10, 15, 14, 10, 100},
+        {{2023, 1, 6}, 12, 18, 17, 12, 100},
+        {{2023, 1, 7}, 11, 14, 12, 11, 100},
+        {{2023, 1, 8}, 9, 21, 20, 9, 100}
     };
 
     const StockDataTable table_for_b = {"b", rows_for_b, 8};
@@ -147,23 +147,23 @@ create_rank_diffs_with_different_sized_inputs_fills_rank_diffs_and_went_up_corre
         .tables = (StockDataTable[]){table_for_a, table_for_b},
         .table_count = 2
     };
-    initialize_symbol_to_ranks_hash_map(&stock_tables, &map);
+    initialize_symbol_to_ranks_hash_map(&stock_tables, map);
 
     StockDataTable* valid_tables[2] = {
         &stock_tables.tables[0],
         &stock_tables.tables[1]
     };
-    rank_valid_stocks_by_low(&map, valid_tables, 2);
+    rank_valid_stocks_by_low(map, valid_tables, 2);
 
     create_rank_diffs(
-        &map,
+        map,
         2,
         3
     );
     const StockRanks* ranks_for_a =
-        get_from_ranks_hash_map(&map, table_for_a.stock_symbol);
+        get_from_ranks_hash_map(map, table_for_a.stock_symbol);
     const StockRanks* ranks_for_b =
-        get_from_ranks_hash_map(&map, table_for_b.stock_symbol);
+        get_from_ranks_hash_map(map, table_for_b.stock_symbol);
 
     // first two rows did not have previous data for the diff
     for (size_t i = 0; i < 2 ; i++) {
@@ -220,28 +220,28 @@ create_rank_diffs_with_different_sized_inputs_fills_rank_diffs_and_went_up_corre
     assert(ranks_for_a->data_size == 8);
     assert(ranks_for_b->data_size == 9);
 
-    free_symbol_to_ranks_hash_map(&map);
+    free_symbol_to_ranks_hash_map(map);
 }
 
 void rank_valid_stocks_by_low_handles_gaps() {
-    SymbolToRanksHashMap map = {
-        .count = 0
-    };
+    SymbolToRanksHashMap* map = malloc(sizeof(SymbolToRanksHashMap));
+    assert(map != NULL);
+    map->count = 0;
 
     // Stock a
     StockDataRow rows_for_a[] = {
-        {{2023, 1, 1}, 10, 15, 14},
-        {{2023, 1, 2}, 12, 16, 13},
-        {{2023, 1, 3}, 11, 14, 12},
-        {{2023, 1, 4}, 9, 21, 20}
+        {{2023, 1, 1}, 10, 15, 14, 10, 100},
+        {{2023, 1, 2}, 12, 16, 13, 12, 100},
+        {{2023, 1, 3}, 11, 14, 12, 11, 100},
+        {{2023, 1, 4}, 9, 21, 20, 9, 100}
     };
     const StockDataTable table_for_a = {"a", rows_for_a, 4};
 
     // Stock b
     StockDataRow rows_for_b[] = {
-        {{2023, 1, 2}, 9, 16, 14},
-        {{2023, 1, 4}, 13, 18, 13},
-        {{2023, 1, 5}, 14, 22, 21}
+        {{2023, 1, 2}, 9, 16, 14, 9, 100},
+        {{2023, 1, 4}, 13, 18, 13, 13, 100},
+        {{2023, 1, 5}, 14, 22, 21, 14, 100}
     };
     const StockDataTable table_for_b = {"b", rows_for_b, 3};
 
@@ -249,18 +249,18 @@ void rank_valid_stocks_by_low_handles_gaps() {
         .tables = (StockDataTable[]){table_for_a, table_for_b},
         .table_count = 2
     };
-    initialize_symbol_to_ranks_hash_map(&stock_tables, &map);
+    initialize_symbol_to_ranks_hash_map(&stock_tables, map);
 
     StockDataTable* valid_tables[2] = {
         &stock_tables.tables[0],
         &stock_tables.tables[1]
     };
-    rank_valid_stocks_by_low(&map, valid_tables, 2);
+    rank_valid_stocks_by_low(map, valid_tables, 2);
 
     const StockRanks* ranks_for_a =
-        get_from_ranks_hash_map(&map, table_for_a.stock_symbol);
+        get_from_ranks_hash_map(map, table_for_a.stock_symbol);
     const StockRanks* ranks_for_b =
-        get_from_ranks_hash_map(&map, table_for_b.stock_symbol);
+        get_from_ranks_hash_map(map, table_for_b.stock_symbol);
 
     // Rank
     assert(ranks_for_a->rank_per_day[0] == 0);
@@ -327,7 +327,7 @@ void rank_valid_stocks_by_low_handles_gaps() {
         assert(ranks_for_b->rank_diffs[i] == 0);
     }
 
-    free_symbol_to_ranks_hash_map(&map);
+    free_symbol_to_ranks_hash_map(map);
 }
 
 
@@ -368,11 +368,18 @@ void is_leap_year_returns_correct_result() {
 }
 
 void get_from_ranks_hash_map_non_inserted_key_returns_null() {
-    SymbolToRanksHashMap map = {.count = 0};
+    SymbolToRanksHashMap* map = malloc(sizeof(SymbolToRanksHashMap));
+    assert(map != NULL);
+    map->count = 0;
+    memset(map->symbol_to_ranks, 0, sizeof(map->symbol_to_ranks));
 
-    const auto inserted_symbol = "abcd";
-    StockRanks sr = {.stock_symbol = inserted_symbol};
-    add_to_rank_hash_map(&map, &sr);
+    auto const inserted_symbol = "abcd";
+    StockRanks* sr = malloc(sizeof(StockRanks));
+    assert(sr != NULL);
+    memset(sr, 0, sizeof(StockRanks));
+    sr->stock_symbol = inserted_symbol;
+
+    add_to_rank_hash_map(map, sr);
 
     // Find a different key with the same hash
     const uint16_t target_hash = hash_symbol(inserted_symbol);
@@ -390,8 +397,9 @@ void get_from_ranks_hash_map_non_inserted_key_returns_null() {
     }
 
     const StockRanks* result =
-        get_from_ranks_hash_map(&map, not_inserted_symbol);
+        get_from_ranks_hash_map(map, not_inserted_symbol);
     assert(result == NULL);
+    free_symbol_to_ranks_hash_map(map);
 }
 
 
@@ -572,17 +580,17 @@ void get_min_and_max_dates_finds_min_and_max() {
 
     // This covers a bug found in another test
     StockDataRow rows_for_a[] = {
-        {{2023, 1, 1}, 10, 15, 14},
-        {{2023, 1, 2}, 12, 16, 13},
-        {{2023, 1, 3}, 11, 14, 12},
-        {{2023, 1, 4}, 9, 21, 20}
+        {{2023, 1, 1}, 10, 15, 14, 10, 100},
+        {{2023, 1, 2}, 12, 16, 13, 12, 100},
+        {{2023, 1, 3}, 11, 14, 12, 11, 100},
+        {{2023, 1, 4}, 9, 21, 20, 9, 100}
     };
     StockDataTable table_for_a = {.rows = rows_for_a, .row_count = 4};
 
     StockDataRow rows_for_b[] = {
-        {{2023, 1, 2}, 9, 16, 14},
-        {{2023, 1, 4}, 13, 18, 13},
-        {{2023, 1, 5}, 14, 22, 21}
+        {{2023, 1, 2}, 9, 16, 14, 9, 100},
+        {{2023, 1, 4}, 13, 18, 13, 13, 100},
+        {{2023, 1, 5}, 14, 22, 21, 14, 100}
     };
     StockDataTable table_for_b = {.rows = rows_for_b, .row_count = 3};
 
@@ -600,60 +608,74 @@ void get_min_and_max_dates_finds_min_and_max() {
 
 
 void add_to_rank_hash_map_duplicates_insert() {
-    SymbolToRanksHashMap map = {
-        .count = 0,
-    };
+    SymbolToRanksHashMap* map = malloc(sizeof(SymbolToRanksHashMap));
+    assert(map != NULL);
+    map->count = 0;
+    memset(map->symbol_to_ranks, 0, sizeof(map->symbol_to_ranks));
 
-    StockRanks sr1 = {.stock_symbol = "aapl"};
-    StockRanks sr2 = {.stock_symbol = "msft"};
-    StockRanks sr3 = {.stock_symbol = "aapl"};
+    StockRanks* sr1 = malloc(sizeof(StockRanks));
+    assert(sr1 != NULL);
+    memset(sr1, 0, sizeof(StockRanks));
+    sr1->stock_symbol = "aapl";
+    StockRanks* sr2 = malloc(sizeof(StockRanks));
+    assert(sr2 != NULL);
+    memset(sr2, 0, sizeof(StockRanks));
+    sr2->stock_symbol = "msft";
+    StockRanks* sr3 = malloc(sizeof(StockRanks));
+    assert(sr3 != NULL);
+    memset(sr3, 0, sizeof(StockRanks));
+    sr3->stock_symbol = "aapl";
 
-    add_to_rank_hash_map(&map, &sr1);
-    add_to_rank_hash_map(&map, &sr2);
-    add_to_rank_hash_map(&map, &sr3);
+    add_to_rank_hash_map(map, sr1);
+    add_to_rank_hash_map(map, sr2);
+    add_to_rank_hash_map(map, sr3);
 
-    const StockRanks* r1 = get_from_ranks_hash_map(&map, "aapl");
-    const StockRanks* r2 = get_from_ranks_hash_map(&map, "msft");
+    const StockRanks* r1 = get_from_ranks_hash_map(map, "aapl");
+    const StockRanks* r2 = get_from_ranks_hash_map(map, "msft");
 
-    assert(map.count == 3);
+    assert(map->count == 3);
     assert(r1 != NULL);
-    assert((r1 == &sr1));
+    assert((r1 == sr1));
     assert(r2 != NULL);
-    assert((r2 == &sr2));
+    assert((r2 == sr2));
+    free_symbol_to_ranks_hash_map(map);
 }
 
 void initialize_symbol_to_ranks_hash_map_correctly_initializes() {
-    const auto stock_symbol = "fake";
+    auto const stock_symbol = "fake";
 
-    StockDataTable stock_table = {
-        .stock_symbol = (stock_symbol),
-        .rows = nullptr,
-        .row_count = 1
-    };
+    StockDataTable* stock_table = malloc(sizeof(StockDataTable));
+    assert(stock_table != NULL);
+    stock_table->stock_symbol = strdup(stock_symbol);
+    stock_table->rows = nullptr;
+    stock_table->row_count = 1;
 
-    const StockDataTables stock_data_tables = {
-        .tables = &stock_table,
-        .table_count = 1
-    };
+    StockDataTables* stock_data_tables =
+        malloc(sizeof(StockDataTables));
+    assert(stock_data_tables != NULL);
+    stock_data_tables->tables = stock_table;
+    stock_data_tables->table_count = 1;
 
-    auto symbol_to_ranks_map = (SymbolToRanksHashMap){
-        .count = 0
-    };
+    SymbolToRanksHashMap* symbol_to_ranks_map =
+        malloc(sizeof(SymbolToRanksHashMap));
+    assert(symbol_to_ranks_map != NULL);
+    symbol_to_ranks_map->count = 0;
+
     initialize_symbol_to_ranks_hash_map(
-        &stock_data_tables,
-        &symbol_to_ranks_map
+        stock_data_tables,
+        symbol_to_ranks_map
     );
 
-    assert(symbol_to_ranks_map.count == 1);
+    assert(symbol_to_ranks_map->count == 1);
 
     const StockRanks* stock_ranks = get_from_ranks_hash_map(
-        &symbol_to_ranks_map,
-        stock_symbol
+        symbol_to_ranks_map,
+        stock_table->stock_symbol
     );
     assert(stock_ranks);
     assert(stock_ranks->current_index == 0);
     assert(stock_ranks->data_size == LARGEST_STOCK_DATASET_SIZE * 2);
-    assert(stock_ranks->stock_symbol == stock_table.stock_symbol);
+    assert(stock_ranks->stock_symbol == stock_table->stock_symbol);
     assert(stock_ranks->rank_per_day != NULL);
     assert(stock_ranks->low_per_day != NULL);
     assert(stock_ranks->high_per_day != NULL);
@@ -661,7 +683,8 @@ void initialize_symbol_to_ranks_hash_map_correctly_initializes() {
     assert(stock_ranks->rank_diffs == NULL);
     assert(stock_ranks->went_up == NULL);
 
-    free_symbol_to_ranks_hash_map(&symbol_to_ranks_map);
+    free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+    free_stock_data_tables(stock_data_tables);
 }
 
 void run_ranks_tests() {

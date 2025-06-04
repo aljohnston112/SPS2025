@@ -84,7 +84,7 @@ void add_to_hash_map_or_get_with_collision_and_a_resize_contains_all_nodes_after
     assert(node->map);
     assert(node->size == START_MAP_SIZE);
     node->count_down = 1;
-    node->count_up = -1;
+    node->count_up = 2;
 
     // Add a key that hashes to the same value
     const size_t initial_size = root->size;
@@ -95,19 +95,19 @@ void add_to_hash_map_or_get_with_collision_and_a_resize_contains_all_nodes_after
     assert(node->map);
     assert(node->size == START_MAP_SIZE);
     node->count_down = dup_key;
-    node->count_up = -dup_key;
+    node->count_up = dup_key * dup_key;
 
     assert(root->current_size == 2);
 
     // Trigger resize
-    const size_t till_resize = root->size / 2;
-    for (long i = 0; i < till_resize; i++) {
+    const uint32_t till_resize = root->size / 2;
+    for (uint32_t i = 0; i < till_resize; i++) {
         node = add_to_hash_map_or_get(root, i + 2);
         assert(node != NULL && node->key == i + 2);
         assert(node->map);
         assert(node->size == START_MAP_SIZE);
         node->count_down = i + 2;
-        node->count_up = -(i + 2);
+        node->count_up = (i + 2) * (i + 2);
     }
 
     assert(is_prime(root->size));
@@ -117,22 +117,24 @@ void add_to_hash_map_or_get_with_collision_and_a_resize_contains_all_nodes_after
     node = get_from_tree_hash_map(root, 1);
     assert(node != NULL && node->key == 1);
     assert(node->count_down == 1);
-    assert(node->count_up == -1);
+    assert(node->count_up == 2);
     assert(node->map);
     assert(node->size == START_MAP_SIZE);
 
     node = get_from_tree_hash_map(root, dup_key);
     assert(node != NULL && node->key == dup_key);
-    assert(node->count_down == dup_key);
-    assert(node->count_up == -dup_key);
+    assert(node->count_down == (uint64_t)dup_key);
+    assert(dup_key * dup_key > dup_key);
+    assert(node->count_up == (uint64_t)(dup_key * dup_key));
     assert(node->map);
     assert(node->size == START_MAP_SIZE);
 
-    for (long i = 0; i < till_resize; i++) {
+    for (uint32_t i = 0; i < till_resize; i++) {
         node = add_to_hash_map_or_get(root, i + 2);
         assert(node != NULL && node->key == i + 2);
-        assert(node->count_down == i + 2);
-        assert(node->count_up == -(i + 2));
+        assert(node->count_down == (uint64_t)(i + 2));
+        assert((i + 2) * (i + 2) > (i + 2));
+        assert(node->count_up == (uint64_t)((i + 2) * (i + 2)));
         assert(node->map);
         assert(node->size == START_MAP_SIZE);
     }

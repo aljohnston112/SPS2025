@@ -25,7 +25,7 @@ bool allocateDirectionDataArrays(
         exit(1);
     }
 
-    for (int i = 0; i < number_of_stocks; i++) {
+    for (size_t i = 0; i < number_of_stocks; i++) {
         const StockDataTable* raw_stock_data_row_array =
             &raw_stock_data_array->tables[i];
         size_t direction_data_size = raw_stock_data_row_array->row_count - BUY_SELL_LAG - 1;
@@ -79,7 +79,7 @@ void getDirectionDataForSingle(
     double lastVolume = currentRow->volume;
 
     if (stock_row_array->row_count >= BUY_SELL_LAG) {
-        for (int i = BUY_SELL_LAG + 1; i < stock_row_array->row_count; i++) {
+        for (size_t i = BUY_SELL_LAG + 1; i < stock_row_array->row_count; i++) {
             unsigned char record = 0;
             currentRow = &stock_row_array->rows[i];
 
@@ -124,7 +124,6 @@ void getDirectionDataForSingle(
                 record += (1 << WAS_PROFIT_POSITION);
             }
 
-            assert(i - BUY_SELL_LAG - 1 >= 0);
             direction_data->direction_data_array[i - BUY_SELL_LAG - 1] = record;
 
             lastMonth = month;
@@ -161,7 +160,7 @@ bool getDirectionData(
         num_threads(180) \
         proc_bind(close)
 #endif
-    for (int i = 0;
+    for (size_t i = 0;
          i < (*all_direction_data)->data_size;
          i++
     ) {
@@ -179,14 +178,14 @@ bool allocateDirectionCountArrays(
         number_of_stocks * sizeof(DirectionCountArray));
     all_direction_counts->data_size = number_of_stocks;
     if (all_direction_counts->direction_counts_array == NULL) {
-        for (int j = 0; j < all_direction_data->data_size; j++) {
+        for (size_t j = 0; j < all_direction_data->data_size; j++) {
             free(all_direction_data->direction_data_arrays[j].direction_data_array);
         }
         free(all_direction_data->direction_data_arrays);
         perror("malloc failed");
         return false;
     }
-    for (int i = 0; i < number_of_stocks; i++) {
+    for (size_t i = 0; i < number_of_stocks; i++) {
         all_direction_counts->direction_counts_array[i].stock_symbol =
             all_direction_data->direction_data_arrays[i].stock_symbol;
     }
@@ -207,7 +206,7 @@ bool allocateDirectionStreakArray(
         return false;
     }
 
-    for (int i = 0; i < number_of_stocks; i++) {
+    for (size_t i = 0; i < number_of_stocks; i++) {
         const DirectionDataArray* direction_data_row_array =
             &direction_data_array->direction_data_arrays[i];
         size_t direction_streak_size = direction_data_row_array->data_size - 2;
@@ -225,7 +224,7 @@ bool allocateDirectionStreakArray(
             stock_symbol;
 
         if (direction_streak_row_array->profit_streak_array == NULL) {
-            for (int j = 0; j < i; j++) {
+            for (size_t j = 0; j < i; j++) {
                 free(direction_streaks_array->profit_streaks_arrays[j].
                     profit_streak_array);
             }
@@ -251,7 +250,7 @@ void getDirectionStreaksForSingle(
     bool was_profit = true;
     long current_streak = 0;
     u_long current_streak_index = 0;
-    for (int j = 0; j < direction_data.data_size; j++) {
+    for (size_t j = 0; j < direction_data.data_size; j++) {
         const u_int8_t c = direction_data.direction_data_array[j];
         const bool is_profit = c & PROFIT_EXTRACTION_BITMASK;
         if (is_profit == was_profit) {
@@ -290,7 +289,7 @@ bool getProfitStreaks(
         proc_bind(close) \
         if(IS_PARALLEL)
 #endif
-    for (int i = 0; i < (*all_direction_data)->data_size; i++) {
+    for (size_t i = 0; i < (*all_direction_data)->data_size; i++) {
         getDirectionStreaksForSingle(
             *all_direction_data,
             *all_direction_streaks,
@@ -310,7 +309,7 @@ bool calculateDirectionCounts(
     if (!success) {
         return false;
     }
-    for (int i = 0; i < (*all_direction_data)->data_size; i++) {
+    for (size_t i = 0; i < (*all_direction_data)->data_size; i++) {
         const DirectionDataArray* direction_data = &(*all_direction_data)->
             direction_data_arrays[i];
         DirectionCountArray* direction_counts = &(*all_direction_counts)->
@@ -319,7 +318,7 @@ bool calculateDirectionCounts(
         for (int j = 0; j < 512; j++) {
             counts[j] = 0;
         }
-        for (int j = 0; j < direction_data->data_size; j++) {
+        for (size_t j = 0; j < direction_data->data_size; j++) {
             const u_int8_t c = direction_data->direction_data_array[j];
             if (counts[c] > DBL_MAX - 1) {
                 fprintf(stderr, "Overflow detected in direction counting\n");
@@ -333,7 +332,7 @@ bool calculateDirectionCounts(
 }
 
 void freeDirectionData(AllDirectionDataArrays* all_direction_data) {
-    for (int j = 0; j < all_direction_data->data_size; j++) {
+    for (size_t j = 0; j < all_direction_data->data_size; j++) {
         free(all_direction_data->direction_data_arrays[j].direction_data_array);
     }
     free(all_direction_data->direction_data_arrays);
@@ -346,7 +345,7 @@ void freeDirectionCounts(AllDirectionCountArrays* all_direction_counts) {
 }
 
 void free_direction_streaks(AllProfitStreakArrays* all_direction_streaks) {
-    for (int i = 0; i < all_direction_streaks->data_size; i++) {
+    for (size_t i = 0; i < all_direction_streaks->data_size; i++) {
         free(all_direction_streaks->profit_streaks_arrays[i].profit_streak_array);
     }
     free(all_direction_streaks->profit_streaks_arrays);

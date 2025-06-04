@@ -17,7 +17,7 @@ typedef struct {
 
 void load_stock_data_from_files(
     const FilePathList* file_path_list,
-    const StockDataTables* stock_data_tables,
+    StockDataTables* stock_data_tables,
     const uint16_t* start_year,
     const uint16_t* end_year
 );
@@ -38,8 +38,6 @@ bool load_stock_data_from_disk(
     const char* folder
 );
 
-void free_stock_data_tables(
-    const StockDataTables* stock_data_tables
-);
+void free_stock_data_tables(StockDataTables* stock_data_tables);
 
 #endif // FILE_UTIL_H

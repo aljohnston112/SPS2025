@@ -2,6 +2,7 @@
 #define TREE_H
 
 #include <sys/types.h>
+#include <stdio.h>
 
 #include "ranks.h"
 
@@ -876,11 +877,11 @@ typedef struct TreeHashMap TreeHashMap;
 
 struct TreeHashMap {
     TreeHashMap** map;
-    u_int64_t size;
-    u_int64_t current_size;
+    uint64_t size;
+    uint64_t current_size;
     long key;
-    u_int64_t count_up;
-    u_int64_t count_down;
+    uint64_t count_up;
+    uint64_t count_down;
 };
 
 void get_prediction_from_hash_map(
@@ -895,7 +896,7 @@ void print_tree(const TreeHashMap* root);
 
 void free_tree(TreeHashMap* root);
 
-
+void export_tree_to_csv(const TreeHashMap* root, FILE* out);
 
 TreeHashMap* get_from_tree_hash_map(const TreeHashMap* map, long key);
 

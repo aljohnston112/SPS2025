@@ -12,9 +12,9 @@
 #include "csv_util.h"
 #include "internal_config.h"
 
-void free_stock_data_tables(const StockDataTables* stock_data_tables) {
+void free_stock_data_tables(StockDataTables* stock_data_tables) {
     for (
-        int i = 0;
+        size_t i = 0;
         i < stock_data_tables->table_count;
         i++
     ) {
@@ -22,6 +22,7 @@ void free_stock_data_tables(const StockDataTables* stock_data_tables) {
         free(stock_data_tables->tables[i].stock_symbol);
     }
     free(stock_data_tables->tables);
+    free(stock_data_tables);
 }
 
 /**
@@ -30,7 +31,7 @@ void free_stock_data_tables(const StockDataTables* stock_data_tables) {
  * @param file_path_list The file path list to free all the paths of.
  */
 void freeAllFilesPaths(FilePathList* file_path_list) {
-    for (int i = 0; i < file_path_list->file_count; i++) {
+    for (size_t i = 0; i < file_path_list->file_count; i++) {
         free(file_path_list->file_paths[i]);
     }
     free(file_path_list->file_paths);
@@ -77,7 +78,7 @@ char* extract_symbol(const char* path) {
  */
 void load_stock_data_from_files(
     const FilePathList* file_path_list,
-    const StockDataTables* stock_data_tables,
+    StockDataTables* stock_data_tables,
     const uint16_t* start_year,
     const uint16_t* end_year
 ) {
@@ -89,7 +90,7 @@ shared(file_count, file_path_list, stock_data_tables, start_year, end_year) \
 num_threads(180) \
 proc_bind(close)
 #endif
-    for (int i = 0; i < file_count; i++) {
+    for (size_t i = 0; i < file_count; i++) {
         const char* file_name = file_path_list->file_paths[i];
         StockDataTable* table = &stock_data_tables->tables[i];
         table->stock_symbol = extract_symbol(file_name);
@@ -100,6 +101,26 @@ proc_bind(close)
             end_year
         );
     }
+
+    // Free the zero sized tables and shift the remaining ones over
+    size_t write_index = 0;
+    const size_t old_table_count = stock_data_tables->table_count;
+    for (size_t read_index = 0; read_index < old_table_count; read_index++) {
+        StockDataTable* table = &stock_data_tables->tables[read_index];
+        if (table->row_count == 0) {
+            free(table->stock_symbol);
+            free(table->rows);
+            continue;
+        }
+
+        if (write_index != read_index) {
+            stock_data_tables->tables[write_index] = *table;
+            table->stock_symbol = nullptr;
+            table->rows = nullptr;
+        }
+        write_index++;
+    }
+    stock_data_tables->table_count = write_index;
 }
 
 int get_all_file_path_recursive_helper(
@@ -253,7 +274,7 @@ bool load_stock_data_from_disk(
     }
 
     // Create space for the stock data
-    for (int i = 0; i < file_count; i++) {
+    for (size_t i = 0; i < file_count; i++) {
         StockDataTable* current_table = &stock_data_tables->tables[i];
         current_table->rows =
             malloc(LARGEST_STOCK_DATASET_SIZE * sizeof(StockDataRow));

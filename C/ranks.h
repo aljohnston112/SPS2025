@@ -30,7 +30,7 @@ typedef struct {
     size_t current_index;
 } ActiveStock;
 
-void free_symbol_to_ranks_hash_map(const SymbolToRanksHashMap* ranks);
+void free_symbol_to_ranks_hash_map(SymbolToRanksHashMap* ranks);
 
 void create_rank_diffs(
     const SymbolToRanksHashMap* symbol_to_ranks_map,

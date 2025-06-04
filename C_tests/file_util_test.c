@@ -18,22 +18,21 @@
 #define TEST_FILE_COUNT 2
 
 void load_stock_data_from_disk_loads_correct_data() {
-    StockDataTables tables = (StockDataTables){
-        .tables = nullptr,
-        .table_count = 0
-    };
+    StockDataTables* tables = malloc(sizeof(StockDataTables));
+        tables->tables = nullptr;
+        tables->table_count = 0;
     const bool success = load_stock_data_from_disk(
-        &tables,
+        tables,
         nullptr,
         nullptr,
         "./test_data"
     );
     assert(success);
-    assert(tables.tables);
-    assert(tables.table_count == 2);
+    assert(tables->tables);
+    assert(tables->table_count == 2);
 
     for (int i = 0; i < TEST_FILE_COUNT; i++) {
-        const StockDataTable* table = &tables.tables[i];
+        const StockDataTable* table = &tables->tables[i];
         const bool is_first =
             strcmp(table->stock_symbol, "fake_data") == 0;
         const bool is_second =
@@ -47,27 +46,26 @@ void load_stock_data_from_disk_loads_correct_data() {
         }
     }
 
-    freeStockDataTables(&tables);
+    free_stock_data_tables(tables);
 }
 
 void load_stock_data_from_disk_with_start_date_loads_correct_data() {
-    StockDataTables tables = (StockDataTables){
-        .tables = nullptr,
-        .table_count = 0
-    };
+    StockDataTables* tables = malloc(sizeof(StockDataTables));
+        tables->tables = nullptr;
+        tables->table_count = 0;
     constexpr uint16_t start_year = 2001;
     const bool success = load_stock_data_from_disk(
-        &tables,
+        tables,
         &start_year,
         nullptr,
         "./test_data"
     );
     assert(success);
-    assert(tables.tables != NULL);
-    assert(tables.table_count == 2);
+    assert(tables->tables != NULL);
+    assert(tables->table_count == 2);
 
     for (int i = 0; i < TEST_FILE_COUNT; i++) {
-        const StockDataTable* table = &tables.tables[i];
+        const StockDataTable* table = &tables->tables[i];
         const bool is_first =
             strcmp(table->stock_symbol, "fake_data") == 0;
         const bool is_second =
@@ -82,63 +80,52 @@ void load_stock_data_from_disk_with_start_date_loads_correct_data() {
         }
     }
 
-    freeStockDataTables(&tables);
+    free_stock_data_tables(tables);
 }
 
 void load_stock_data_from_disk_with_end_date_loads_correct_data() {
-    StockDataTables tables = (StockDataTables){
-        .tables = nullptr,
-        .table_count = 0
-    };
+    StockDataTables* tables = malloc(sizeof(StockDataTables));
+    tables->tables = nullptr;
+    tables->table_count = 0;
+
     constexpr uint16_t end_year = 2001;
     const bool success = load_stock_data_from_disk(
-        &tables,
+        tables,
         nullptr,
         &end_year,
         "./test_data"
     );
     assert(success);
-    assert(tables.tables != NULL);
-    assert(tables.table_count == 2);
+    assert(tables->tables != NULL);
+    assert(tables->table_count == 1);
 
-    for (int i = 0; i < TEST_FILE_COUNT; i++) {
-        const StockDataTable* table = &tables.tables[i];
-        const bool is_first =
-            strcmp(table->stock_symbol, "fake_data") == 0;
-        const bool is_second =
-            strcmp(table->stock_symbol, "fake_data2") == 0;
-        assert(is_first || is_second);
-        if (is_first) {
-            assert(table->row_count == 4);
-            check_table(table, expected_rows_for_fake_data, 4);
-        } else {
-            assert(table->row_count == 0);
-            check_table(table, expected_rows_for_fake_data2, 0);
-        }
-    }
+    const StockDataTable* table = &tables->tables[0];
+    assert(strcmp(table->stock_symbol, "fake_data") == 0);
+    assert(table->row_count == 4);
+    check_table(table, expected_rows_for_fake_data, 4);
 
-    freeStockDataTables(&tables);
+    free_stock_data_tables(tables);
 }
 
 void load_stock_data_from_disk_with_start_and_end_date_loads_correct_data() {
-    StockDataTables tables = (StockDataTables){
-        .tables = nullptr,
-        .table_count = 0
-    };
+    StockDataTables* tables = malloc(sizeof(StockDataTables));
+    tables->tables = nullptr;
+    tables->table_count = 0;
+
     constexpr uint16_t start_year = 2001;
     constexpr uint16_t end_year = 2002;
     const bool success = load_stock_data_from_disk(
-        &tables,
+        tables,
         &start_year,
         &end_year,
         "./test_data"
     );
     assert(success);
-    assert(tables.tables != NULL);
-    assert(tables.table_count == 2);
+    assert(tables->tables != NULL);
+    assert(tables->table_count == 2);
 
     for (int i = 0; i < TEST_FILE_COUNT; i++) {
-        const StockDataTable* table = &tables.tables[i];
+        const StockDataTable* table = &tables->tables[i];
         const bool is_first =
             strcmp(table->stock_symbol, "fake_data") == 0;
         const bool is_second =
@@ -153,7 +140,7 @@ void load_stock_data_from_disk_with_start_and_end_date_loads_correct_data() {
         }
     }
 
-    freeStockDataTables(&tables);
+    free_stock_data_tables(tables);
 }
 
 void load_raw_stock_data_loads_correct_data() {
@@ -166,16 +153,17 @@ void load_raw_stock_data_loads_correct_data() {
         .file_count = TEST_FILE_COUNT
     };
 
-    StockDataTables tables = (StockDataTables){
-        .tables = nullptr,
-        .table_count = 0
-    };
-    tables.tables = malloc(TEST_FILE_COUNT * sizeof(StockDataTable));
-    assert(tables.tables);
-    tables.table_count = TEST_FILE_COUNT;
+    StockDataTables* tables = malloc(sizeof(StockDataTables));
+    assert(tables);
+    tables->tables = nullptr;
+    tables->table_count = 0;
+
+    tables->tables = malloc(TEST_FILE_COUNT * sizeof(StockDataTable));
+    assert(tables->tables);
+    tables->table_count = TEST_FILE_COUNT;
 
     for (int i = 0; i < TEST_FILE_COUNT; i++) {
-        StockDataTable* current_table = &tables.tables[i];
+        StockDataTable* current_table = &tables->tables[i];
         current_table->rows =
             malloc(ROWS_IN_TEST_FILE * sizeof(StockDataRow));
         assert(current_table->rows);
@@ -186,9 +174,9 @@ void load_raw_stock_data_loads_correct_data() {
         }
     }
 
-    load_stock_data_from_files(&file_list, &tables, nullptr, nullptr);
+    load_stock_data_from_files(&file_list, tables, nullptr, nullptr);
     for (int i = 0; i < TEST_FILE_COUNT; i++) {
-        const StockDataTable* table = &tables.tables[i];
+        const StockDataTable* table = &tables->tables[i];
         const bool is_first =
             strcmp(table->stock_symbol, "fake_data") == 0;
         const bool is_second =
@@ -202,7 +190,7 @@ void load_raw_stock_data_loads_correct_data() {
         }
     }
 
-    freeStockDataTables(&tables);
+    free_stock_data_tables(tables);
 }
 
 void load_raw_stock_data_with_start_date_loads_correct_data() {
@@ -215,16 +203,16 @@ void load_raw_stock_data_with_start_date_loads_correct_data() {
         .file_count = TEST_FILE_COUNT
     };
 
-    StockDataTables tables = (StockDataTables){
-        .tables = nullptr,
-        .table_count = 0
-    };
-    tables.tables = malloc(TEST_FILE_COUNT * sizeof(StockDataTable));
-    assert(tables.tables);
-    tables.table_count = TEST_FILE_COUNT;
+    StockDataTables* tables = malloc(sizeof(StockDataTables));
+    tables->tables = nullptr;
+    tables->table_count = 0;
+
+    tables->tables = malloc(TEST_FILE_COUNT * sizeof(StockDataTable));
+    assert(tables->tables);
+    tables->table_count = TEST_FILE_COUNT;
 
     for (int i = 0; i < TEST_FILE_COUNT; i++) {
-        StockDataTable* current_table = &tables.tables[i];
+        StockDataTable* current_table = &tables->tables[i];
         current_table->rows =
             malloc(ROWS_IN_TEST_FILE * sizeof(StockDataRow));
         assert(current_table->rows);
@@ -236,9 +224,9 @@ void load_raw_stock_data_with_start_date_loads_correct_data() {
     }
 
     constexpr uint16_t start_year = 2001;
-    load_stock_data_from_files(&file_list, &tables, &start_year, nullptr);
+    load_stock_data_from_files(&file_list, tables, &start_year, nullptr);
     for (int i = 0; i < TEST_FILE_COUNT; i++) {
-        const StockDataTable* table = &tables.tables[i];
+        const StockDataTable* table = &tables->tables[i];
         const bool is_first =
             strcmp(table->stock_symbol, "fake_data") == 0;
         const bool is_second =
@@ -253,7 +241,7 @@ void load_raw_stock_data_with_start_date_loads_correct_data() {
         }
     }
 
-    freeStockDataTables(&tables);
+    free_stock_data_tables(tables);
 }
 
 void load_raw_stock_data_with_end_date_loads_correct_data() {
@@ -266,16 +254,16 @@ void load_raw_stock_data_with_end_date_loads_correct_data() {
         .file_count = TEST_FILE_COUNT
     };
 
-    StockDataTables tables = (StockDataTables){
-        .tables = nullptr,
-        .table_count = 0
-    };
-    tables.tables = malloc(TEST_FILE_COUNT * sizeof(StockDataTable));
-    assert(tables.tables);
-    tables.table_count = TEST_FILE_COUNT;
+    StockDataTables* tables = malloc(sizeof(StockDataTables));
+    assert(tables);
+    tables->tables = nullptr;
+    tables->table_count = 0;
+    tables->tables = malloc(TEST_FILE_COUNT * sizeof(StockDataTable));
+    assert(tables->tables);
+    tables->table_count = TEST_FILE_COUNT;
 
     for (int i = 0; i < TEST_FILE_COUNT; i++) {
-        StockDataTable* current_table = &tables.tables[i];
+        StockDataTable* current_table = &tables->tables[i];
         current_table->rows =
             malloc(ROWS_IN_TEST_FILE * sizeof(StockDataRow));
         assert(current_table->rows);
@@ -287,24 +275,14 @@ void load_raw_stock_data_with_end_date_loads_correct_data() {
     }
 
     constexpr uint16_t end_year = 2001;
-    load_stock_data_from_files(&file_list, &tables, nullptr, &end_year);
-    for (int i = 0; i < TEST_FILE_COUNT; i++) {
-        const StockDataTable* table = &tables.tables[i];
-        const bool is_first =
-            strcmp(table->stock_symbol, "fake_data") == 0;
-        const bool is_second =
-            strcmp(table->stock_symbol, "fake_data2") == 0;
-        assert(is_first || is_second);
-        if (is_first) {
-            assert(table->row_count == 4);
-            check_table(table, expected_rows_for_fake_data, 4);
-        } else {
-            assert(table->row_count == 0);
-            check_table(table, expected_rows_for_fake_data2, 0);
-        }
-    }
+    load_stock_data_from_files(&file_list, tables, nullptr, &end_year);
+    assert(tables->table_count == 1);
+    const StockDataTable* table = &tables->tables[0];
+    assert(strcmp(table->stock_symbol, "fake_data") == 0);
+    assert(table->row_count == 4);
+    check_table(table, expected_rows_for_fake_data, 4);
 
-    freeStockDataTables(&tables);
+    free_stock_data_tables(tables);
 }
 
 void load_raw_stock_data_with_start_and_end_date_loads_correct_data() {
@@ -317,16 +295,15 @@ void load_raw_stock_data_with_start_and_end_date_loads_correct_data() {
         .file_count = TEST_FILE_COUNT
     };
 
-    StockDataTables tables = (StockDataTables){
-        .tables = nullptr,
-        .table_count = 0
-    };
-    tables.tables = malloc(TEST_FILE_COUNT * sizeof(StockDataTable));
-    assert(tables.tables);
-    tables.table_count = TEST_FILE_COUNT;
+    StockDataTables* tables = malloc(sizeof(StockDataTables));
+    tables->tables = nullptr;
+    tables->table_count = 0;
+    tables->tables = malloc(TEST_FILE_COUNT * sizeof(StockDataTable));
+    assert(tables->tables);
+    tables->table_count = TEST_FILE_COUNT;
 
     for (int i = 0; i < TEST_FILE_COUNT; i++) {
-        StockDataTable* current_table = &tables.tables[i];
+        StockDataTable* current_table = &tables->tables[i];
         current_table->rows =
             malloc(ROWS_IN_TEST_FILE * sizeof(StockDataRow));
         assert(current_table->rows);
@@ -338,9 +315,9 @@ void load_raw_stock_data_with_start_and_end_date_loads_correct_data() {
     }
     constexpr uint16_t start_year = 2001;
     constexpr uint16_t end_year = 2002;
-    load_stock_data_from_files(&file_list, &tables, &start_year, &end_year);
+    load_stock_data_from_files(&file_list, tables, &start_year, &end_year);
     for (int i = 0; i < TEST_FILE_COUNT; i++) {
-        const StockDataTable* table = &tables.tables[i];
+        const StockDataTable* table = &tables->tables[i];
         const bool is_first =
             strcmp(table->stock_symbol, "fake_data") == 0;
         const bool is_second =
@@ -355,7 +332,7 @@ void load_raw_stock_data_with_start_and_end_date_loads_correct_data() {
         }
     }
 
-    freeStockDataTables(&tables);
+    free_stock_data_tables(tables);
 }
 
 void extract_symbol_extracts_symbol() {
