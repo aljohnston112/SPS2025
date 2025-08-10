@@ -29,7 +29,7 @@ void get_all_files_paths_recursive(
     FilePathList* file_path_list
 );
 
-void freeAllFilesPaths(FilePathList* file_path_list);
+void free_all_files_paths(FilePathList* file_path_list);
 
 bool load_stock_data_from_disk(
     StockDataTables* stock_data_tables,

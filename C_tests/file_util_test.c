@@ -354,7 +354,7 @@ void get_all_files_paths_recursive_on_empty_folder_returns_nothing() {
     get_all_files_paths_recursive(folder, &list);
     assert(list.file_count == 0);
     rmdir(folder);
-    freeAllFilesPaths(&list);
+    free_all_files_paths(&list);
 }
 
 void get_all_files_paths_recursive_on_nested_folder_returns_both_files() {
@@ -397,7 +397,7 @@ void get_all_files_paths_recursive_on_nested_folder_returns_both_files() {
     rmdir(nested_folder2_name);
     rmdir(nested_folder_name);
     rmdir(base_folder_name);
-    freeAllFilesPaths(&list);
+    free_all_files_paths(&list);
 }
 
 void run_file_util_tests() {

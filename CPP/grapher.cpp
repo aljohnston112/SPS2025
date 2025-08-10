@@ -7,7 +7,15 @@ extern "C" {
 #include <string>
 #include <vector>
 #include <span>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#pragma GCC diagnostic ignored "-Wfloat-equal"
+#pragma GCC diagnostic ignored "-Wconversion"
 #include "matplotlibcpp.h"
+#pragma GCC diagnostic pop
+
 #include "../C/ranks.h"
 
 namespace plt = matplotlibcpp;

@@ -55,7 +55,10 @@ void get_prediction_from_hash_map(
             &p,
             &d
         );
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
         if (p != 0.0) {
+#pragma GCC diagnostic pop
             *prediction = p;
             *depth = d;
             break;
@@ -102,110 +105,6 @@ void print_tree(const TreeHashMap* root) {
     print_tree_helper(root, 1);
 }
 
-typedef struct {
-    const TreeHashMap* node;
-    int row_index;
-    int depth;
-} QueueItem;
-
-void export_tree_to_csv(const TreeHashMap* root, FILE* out) {
-    if (!root || !out) return;
-
-    int front = 0;
-    int back = 0;
-    int next_row = 0;
-
-    constexpr int MAX_NODES = 10000;
-    QueueItem** queue = malloc(MAX_NODES * sizeof(QueueItem*));
-    queue[back] = malloc(sizeof(QueueItem));
-    queue[back]->node = root;
-    queue[back]->row_index = next_row;
-    queue[back]->depth = 0;
-    back++;
-
-    const TreeHashMap** node_index_map =
-        malloc(MAX_NODES * sizeof(TreeHashMap*));
-    node_index_map[next_row++] = root;
-
-    // Precalculate max children across all nodes
-    size_t max_children = 0;
-    while (front < back) {
-        assert(front < MAX_NODES);
-        const TreeHashMap* node = queue[front++]->node;
-        size_t child_count = 0;
-        for (size_t i = 0; i < node->size; ++i) {
-            if (node->map[i]) {
-                ++child_count;
-            }
-        }
-        if (child_count > max_children) {
-            max_children = child_count;
-        }
-
-        for (size_t i = 0; i < node->size; ++i) {
-            const TreeHashMap* child = node->map[i];
-            if (child) {
-                queue[back] = malloc(sizeof(QueueItem));
-                queue[back]->node = child;
-                queue[back]->row_index = next_row;
-                queue[back]->depth = queue[front - 1]->depth + 1;
-                back++;
-                node_index_map[next_row++] = child;
-            }
-        }
-    }
-
-    // Write CSV header
-    fprintf(out, "Depth,Key,Up,Down");
-
-    for (size_t i = 0; i < max_children; ++i) {
-        fprintf(out, ",C%zu", i);
-    }
-    fprintf(out, "\n");
-
-    // Output all rows in order
-    for (int i = 0; i < next_row; ++i) {
-        const TreeHashMap* node = node_index_map[i];
-        const int depth = queue[i]->depth;
-
-        fprintf(
-            out,
-            "%d,%ld,%lu,%lu",
-            depth,
-            node->key,
-            node->count_up,
-            node->count_down
-        );
-
-        // Write child indices
-        size_t written = 0;
-        for (size_t j = 0; j < node->size; ++j) {
-            const TreeHashMap* child = node->map[j];
-            if (child) {
-                for (int k = 0; k < next_row; ++k) {
-                    if (node_index_map[k] == child) {
-                        fprintf(out, ",%d", k + 2);
-                        break;
-                    }
-                }
-                written++;
-            }
-        }
-        while (written++ < max_children) {
-            fprintf(out, ",-1");
-        }
-
-        fprintf(out, "\n");
-    }
-
-    for (size_t i = 0; i < MAX_NODES; ++i) {
-        if (queue[i]) {
-            free(queue[i]);
-        }
-    }
-    free(queue);
-    free(node_index_map);
-}
 
 void free_tree_helper(TreeHashMap* node) {
     if (node == NULL) {
@@ -232,8 +131,6 @@ void free_tree(TreeHashMap* root) {
 }
 
 
-
-
 TreeHashMap* get_from_tree_hash_map(const TreeHashMap* map, const long key) {
     assert(map);
     TreeHashMap** children = map->map;
@@ -245,7 +142,7 @@ TreeHashMap* get_from_tree_hash_map(const TreeHashMap* map, const long key) {
 
     size_t i = 0;
     while (true) {
-        const size_t index = (key + (i * i)) % number_of_children;
+        const size_t index = ((size_t)key + (i * i)) % number_of_children;
         TreeHashMap* child = children[index];
         if (child == NULL) {
             return nullptr;
@@ -279,18 +176,25 @@ void resize_hash_map(TreeHashMap* map) {
     const size_t old_size = map->size;
     TreeHashMap** old_map = map->map;
     map->map = calloc(newSize, sizeof(TreeHashMap*));
+    if (map->map == NULL) {
+        perror("calloc failed");
+        exit(EXIT_FAILURE);
+    }
     map->size = newSize;
     map->current_size = 0;
     for (size_t i = 0; i < old_size; i++) {
         if (old_map[i] != NULL) {
             TreeHashMap* old_child = old_map[i];
-            int j = 0;
+            size_t j = 0;
             // slot is occupied
-            while (map->map[(old_child->key + (j * j)) % map->size] != NULL) {
+            while (map->map[((size_t)old_child->key + (j * j)) % map->size]
+                !=
+                NULL) {
                 j++;
             }
             // found a spot to put the key, put it in the map
-            const size_t index = (old_child->key + (j * j)) % map->size;
+            const size_t index = ((size_t)old_child->key + (j * j)) % map->
+                size;
 
             map->map[index] = old_child;
             map->current_size++;
@@ -315,11 +219,11 @@ TreeHashMap* add_to_hash_map_or_get(TreeHashMap* map, const long key) {
 
     size_t i = 0;
     // slot is occupied
-    while (map->map[(key + (i * i)) % map_size] != NULL) {
+    while (map->map[((size_t)key + (i * i)) % map_size] != NULL) {
         i++;
     }
     // found a spot to put the key, put it in the map
-    const size_t index = (key + (i * i)) % map_size;
+    const size_t index = ((size_t)key + (i * i)) % map_size;
 
     child = create_tree_hash_map(key);
     map->map[index] = child;

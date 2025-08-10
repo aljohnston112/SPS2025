@@ -12,6 +12,7 @@
 #include "internal_config.h"
 #include "ranks.h"
 #include "tree.h"
+#include "tree_file_util.h"
 #include "../CPP/grapher.h"
 
 #if IS_PARALLEL
@@ -319,7 +320,15 @@ void run_backtest(
 
     // Track when stocks are bailed
     bool* bailed = calloc(all_stock_ranks->count, sizeof(bool));
+    if (bailed == NULL) {
+        perror("calloc failed");
+        exit(EXIT_FAILURE);
+    }
     size_t* bail_days = calloc(all_stock_ranks->count, sizeof(size_t));
+    if (bail_days == NULL) {
+        perror("calloc failed");
+        exit(EXIT_FAILURE);
+    }
 
     // For every day, up to a day when there is still room to sell
     for (
@@ -409,9 +418,9 @@ void run_backtest(
                     i + 1 + BUY_SELL_LAG < stock_ranks->data_size &&
                     i + 1 + BUY_SELL_LAG > i
                 ) {
-                    // Only consider stocks under $20
+                    // Only consider stocks under some price
                     const double buy_price = stock_ranks->high_per_day[i + 1];
-                    if (buy_price < 0.75) {
+                    if (buy_price < 1) {
                         // Assume default sell date
                         uint64_t sell_day = 1 + i + BUY_SELL_LAG;
                         double sell_price = -1.0;
@@ -425,7 +434,7 @@ void run_backtest(
                         ) {
                             // Definitely want to sell if stock reached 50%
                             if (stock_ranks->low_per_day[day] >=
-                                buy_price * 2.5
+                                buy_price * 2
                             ) {
                                 sell_price = stock_ranks->low_per_day[day];
                                 sell_day = day;
@@ -433,7 +442,10 @@ void run_backtest(
                             }
                         }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
                         if (sell_price == -1.0) {
+#pragma GCC diagnostic pop
                             sell_price = 0;
                         }
 
@@ -443,7 +455,7 @@ void run_backtest(
                         }
 
                         // Take 1% of the current capital and use it to buy the stock
-                        const double spent = capital * 0.01;
+                        const double spent = capital * 0.1;
                         open_trades[num_open_trades++] = (OpenTrade){
                             .buy_price = buy_price,
                             .buy_day = i + 1,
@@ -790,7 +802,6 @@ void save_yearly_trees(void) {
             exit(1);
         }
         export_tree_to_csv(tree, fd);
-        fflush(fd);
         fclose(fd);
 
         // tree freed
@@ -800,7 +811,6 @@ void save_yearly_trees(void) {
         // past_symbol_to_ranks_map freed
         // ---------------------------------------------------------------------
         free_symbol_to_ranks_hash_map(past_symbol_to_ranks_map);
-        break;
     }
 
     // past_stock_data_tables freed
@@ -809,8 +819,10 @@ void save_yearly_trees(void) {
 }
 
 void process(void) {
-    prepare_data_and_run_back_test();
-    // save_yearly_trees();
+    // process_and_print_promising_stocks();
+    // prepare_data_and_run_back_test();
+    save_yearly_trees();
+    // TreeHashMap* map = load_trees_from_year(1965);
 }
 
 int main() {
@@ -822,8 +834,6 @@ int main() {
     gettimeofday(&start, NULL);
 
     process();
-
-    // process_and_print_promising_stocks();
 
     gettimeofday(&stop, NULL);
     const double time_taken =

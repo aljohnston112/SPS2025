@@ -10,7 +10,15 @@ void init_seq_matches(SeqMatches* sm, int64_t* seq, const size_t seq_len) {
     sm->capacity = 8;
     sm->n_symbols = 0;
     sm->symbols = malloc(sm->capacity * sizeof(char*));
+    if (sm->symbols == NULL) {
+        perror("malloc failed");
+        exit(EXIT_FAILURE);
+    }
     sm->went_up = malloc(sm->capacity * sizeof(bool));
+    if (sm->went_up == NULL) {
+        perror("malloc failed");
+        exit(EXIT_FAILURE);
+    }
 }
 
 void free_seq_matches(const SeqMatches* sm) {
@@ -47,8 +55,20 @@ void add_seq_match(SeqMatchList* sml, int64_t* seq, const size_t seq_len) {
 void add_match(SeqMatches* sm, char* symbol, const bool went_up) {
     if (sm->n_symbols == sm->capacity) {
         sm->capacity *= 2;
-        sm->symbols = realloc(sm->symbols, sm->capacity * sizeof(char*));
-        sm->went_up = realloc(sm->went_up, sm->capacity * sizeof(bool));
+        char** new_symbols = realloc(sm->symbols, sm->capacity * sizeof(char*));
+        if (new_symbols) {
+            sm->symbols = new_symbols;
+        } else {
+            perror("malloc failed");
+            exit(EXIT_FAILURE);
+        }
+        bool* new_went_up = realloc(sm->went_up, sm->capacity * sizeof(bool));
+        if (new_went_up) {
+            sm->went_up = new_went_up;
+        } else {
+            perror("malloc failed");
+            exit(EXIT_FAILURE);
+        }
     }
     sm->symbols[sm->n_symbols] = symbol;
     sm->went_up[sm->n_symbols] = went_up;
@@ -59,6 +79,10 @@ void init_seq_match_list(SeqMatchList* sml) {
     sml->capacity = 8;
     sml->n_seq_matches = 0;
     sml->seq_matches = malloc(sml->capacity * sizeof(SeqMatches));
+    if (sml->seq_matches == NULL) {
+        perror("malloc failed");
+        exit(EXIT_FAILURE);
+    }
 }
 
 
@@ -90,6 +114,10 @@ void collect_profitable_sequences_helper(
     ) {
         // Copy current sequence for storage
         int64_t* seq_copy = malloc(depth * sizeof(int64_t));
+        if (seq_copy == NULL) {
+            perror("malloc failed");
+            exit(EXIT_FAILURE);
+        }
         memcpy(seq_copy, current_seq, depth * sizeof(int64_t));
         add_seq_match(results, seq_copy, depth);
     }
@@ -115,6 +143,10 @@ void collect_profitable_sequences(
     init_seq_match_list(results);
 
     int64_t* current_seq = malloc(MAX_TREE_DEPTH * sizeof(int64_t));
+    if (current_seq == NULL) {
+        perror("malloc failed");
+        exit(EXIT_FAILURE);
+    }
     collect_profitable_sequences_helper(root, current_seq, 0, results);
     free(current_seq);
 }

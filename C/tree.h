@@ -896,8 +896,6 @@ void print_tree(const TreeHashMap* root);
 
 void free_tree(TreeHashMap* root);
 
-void export_tree_to_csv(const TreeHashMap* root, FILE* out);
-
 TreeHashMap* get_from_tree_hash_map(const TreeHashMap* map, long key);
 
 bool is_prime(size_t value);

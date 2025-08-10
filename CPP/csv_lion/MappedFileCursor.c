@@ -13,13 +13,13 @@ void mapped_file_cursor_clean_up(const MappedFileCursor* self) {
     if (self->startPtr) {
         munmap(
             self->startPtr,
-            self->endPtr - self->startPtr
+            (size_t)(self->endPtr - self->startPtr)
         );
     }
     if (self->guardPtr) {
         munmap(
             self->guardPtr,
-            get_page_size()
+            (size_t)get_page_size()
         );
     }
 }
@@ -50,13 +50,13 @@ int mapped_file_cursor_map_file(MappedFileCursor* self, const char* filename) {
         return -1;
     }
 
-    const unsigned long page_size = get_page_size();
-    const unsigned long page_mask = page_size - 1;
-    const size_t rounded = (st.st_size + page_mask) & ~page_mask;
+    const int long page_size = get_page_size();
+    const long int page_mask = page_size - 1;
+    const long int rounded = (st.st_size + page_mask) & ~page_mask;
 
     char* startp = mmap(
         NULL,
-        rounded + page_size,
+        (size_t)(rounded + page_size),
         PROT_READ,
         MAP_ANON | MAP_PRIVATE,
         -1,
@@ -72,7 +72,7 @@ int mapped_file_cursor_map_file(MappedFileCursor* self, const char* filename) {
 
     self->startPtr = mmap(
         startp,
-        st.st_size,
+        (size_t)st.st_size,
         PROT_READ,
         MAP_SHARED | MAP_FIXED,
         fd,
@@ -81,7 +81,7 @@ int mapped_file_cursor_map_file(MappedFileCursor* self, const char* filename) {
 
     if (self->startPtr == MAP_FAILED) {
         perror("Error mapping file");
-        munmap(startp, rounded + page_size);
+        munmap(startp, (size_t)(rounded + page_size));
         close(fd);
         return errno;
     }

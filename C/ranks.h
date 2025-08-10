@@ -7,7 +7,6 @@
 #include "config.h"
 #include "file_util.h"
 
-
 typedef struct {
     char* stock_symbol;
     int64_t* rank_per_day;

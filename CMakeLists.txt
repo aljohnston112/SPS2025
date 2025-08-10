@@ -11,7 +11,62 @@ if (USE_GCC)
             -Wall
             -Wextra
             -Wpedantic
+            -Walloca
+            -Warray-bounds=2
+            -Wattribute-alias=2
+            -Wbidi-chars=any
+            -Wcast-qual
+            -Wcomments
+            -Wconversion
+            -Wdisabled-optimization
+            -Wduplicated-cond
+            -Wflex-array-member-not-at-end
+            -Wformat=2
+            -Wformat-nonliteral
+            -Wformat-overflow=2
+            -Wshadow
+            -Wformat-security
+            -Wpacked
+            -Wredundant-decls
+            -Wnull-dereference
+            -Wmultichar
+            -Wstrict-overflow=5
+            -Wnormalized=nfkc
+            -fanalyzer
+            -Wformat-signedness
+            -Wlogical-op
+            -Wformat-truncation=2
+            -Wformat-y2k
+            -Wmissing-format-attribute
+            -Wimplicit-fallthrough=5
+            -Winit-self
+            -Wstack-protector
+            -Winvalid-utf8
+            -Wstringop-overflow=4
+            -Wfloat-equal
+            -Wsuggest-attribute=cold
+            -Wsuggest-attribute=const
+            -Wsuggest-attribute=format
+            -Wsuggest-attribute=malloc
+            -Wsuggest-attribute=noreturn
+            -Wsuggest-attribute=pure
+            -Wsuggest-attribute=returns_nonnull
+            -Wswitch-enum
+            -Wswitch-default
+            -Wduplicated-branches
+            -Wtrivial-auto-var-init
+            -ftrivial-auto-var-init=pattern
+            -Wunused-macros
+            -Wwrite-strings
+            -Wzero-as-null-pointer-constant
+            -Wuse-after-free=3
+            --strict-flex-arrays=3
+            -Wanalyzer-symbol-too-complex
+            -fstack-clash-protection
+            -Wframe-larger-than=8192
             -Wstack-usage=8192
+            -fstack-protector
+            --param=analyzer-max-svalue-depth=50
     )
 else ()
     set(CMAKE_C_COMPILER "clang")
@@ -29,9 +84,9 @@ endif ()
 set(COMMON_LINK_FLAGS)
 
 set(ENABLE_COVERAGE true)
-if(ENABLE_COVERAGE)
+if (ENABLE_COVERAGE)
     list(APPEND COMMON_COMPILE_FLAGS --coverage)
-endif()
+endif ()
 
 project(SPS2025 C CXX)
 
@@ -66,6 +121,7 @@ set(
         C/tree.c
         C/ranks.c
         C/sequence_analyzer.c
+        C/tree_file_util.c
 )
 
 set(
@@ -82,6 +138,7 @@ set(
         C/tree.h
         C/ranks.h
         C/sequence_analyzer.h
+        C/tree_file_util.h
 )
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development NumPy)
@@ -125,7 +182,7 @@ if (PARALLEL)
 endif ()
 target_link_libraries(SPS2025 PRIVATE ${Python3_LIBRARIES})
 
-if(ENABLE_COVERAGE)
+if (ENABLE_COVERAGE)
     target_link_libraries(SPS2025 PRIVATE gcov)
 endif ()
 
@@ -171,7 +228,7 @@ if (PARALLEL)
 endif ()
 file(COPY C_tests/test_data DESTINATION ${CMAKE_BINARY_DIR})
 
-if(ENABLE_COVERAGE)
+if (ENABLE_COVERAGE)
     target_link_libraries(SPS2025Test PRIVATE gcov)
 
     find_program(LCOV_EXEC lcov)
@@ -194,7 +251,7 @@ if(ENABLE_COVERAGE)
             COMMAND xdg-open coverage_html/index.html
             COMMENT "Generating and opening coverage report..."
     )
-endif()
+endif ()
 
 add_library(
         array_to_python SHARED

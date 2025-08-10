@@ -10,7 +10,9 @@
 
 #include "config.h"
 #include "csv_util.h"
+#include "tree.h"
 #include "internal_config.h"
+#include "tree_file_util.h"
 
 void free_stock_data_tables(StockDataTables* stock_data_tables) {
     for (
@@ -30,7 +32,7 @@ void free_stock_data_tables(StockDataTables* stock_data_tables) {
  *
  * @param file_path_list The file path list to free all the paths of.
  */
-void freeAllFilesPaths(FilePathList* file_path_list) {
+void free_all_files_paths(FilePathList* file_path_list) {
     for (size_t i = 0; i < file_path_list->file_count; i++) {
         free(file_path_list->file_paths[i]);
     }
@@ -52,13 +54,13 @@ char* extract_symbol(const char* path) {
         const char* dotPosition = strchr(lastSlashPosition, '.');
         assert(dotPosition != NULL);
 
-        const size_t symbol_length = dotPosition - lastSlashPosition;
-        symbol = malloc(symbol_length + 1); // +1 for null-terminator
+        const long int symbol_length = dotPosition - lastSlashPosition;
+        symbol = malloc((size_t)symbol_length + 1); // +1 for null-terminator
         if (symbol == NULL) {
             perror("Failed to allocate memory for symbol string");
             exit(EXIT_FAILURE);
         }
-        strncpy(symbol, lastSlashPosition, symbol_length);
+        strncpy(symbol, lastSlashPosition, (size_t)symbol_length);
         symbol[symbol_length] = '\0';
     }
     return symbol;
@@ -123,7 +125,7 @@ proc_bind(close)
     stock_data_tables->table_count = write_index;
 }
 
-int get_all_file_path_recursive_helper(
+void get_all_file_paths_recursive_helper(
     const char* folder,
     FilePathList* file_path_list,
     DIR* dir
@@ -140,14 +142,14 @@ int get_all_file_path_recursive_helper(
         char* full_path = nullptr;
         if (asprintf(&full_path, "%s/%s", folder, entry->d_name) == -1) {
             perror("Failed to get file path\n");
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         }
 
         // Only add if a file; not a directory
         struct stat file_stat;
         if (stat(full_path, &file_stat) != 0) {
             perror("Failed to stat file\n");
-            return EXIT_FAILURE;
+            exit(EXIT_FAILURE);
         }
         if (S_ISREG(file_stat.st_mode)) {
             file_path_list->file_paths[file_path_list->file_count] = full_path;
@@ -163,16 +165,10 @@ int get_all_file_path_recursive_helper(
                 perror("Failed to open directory to get all files paths\n");
                 exit(EXIT_FAILURE);
             }
-            if (get_all_file_path_recursive_helper(
-                    full_path,
-                    file_path_list, sub_dir
-                ) == EXIT_FAILURE
-            ) {
-                // sub_dir closed
-                // -------------------------------------------------------------
-                closedir(sub_dir);
-                return EXIT_FAILURE;
-            }
+            get_all_file_paths_recursive_helper(
+                full_path,
+                file_path_list, sub_dir
+            );
             // sub_dir closed
             // -----------------------------------------------------------------
             closedir(sub_dir);
@@ -181,7 +177,6 @@ int get_all_file_path_recursive_helper(
             free(full_path);
         }
     }
-    return EXIT_SUCCESS;
 }
 
 /**
@@ -212,22 +207,14 @@ void get_all_files_paths_recursive(
         malloc(NUMBER_OF_STOCK_EXAMPLES * sizeof(char*));
     if (file_path_list->file_paths == NULL) {
         perror("Failed to allocate space for file paths\n");
-        goto error;
+        exit(1);
     }
     file_path_list->file_count = 0;
 
-    if (get_all_file_path_recursive_helper(folder, file_path_list, dir) ==
-        EXIT_FAILURE
-    ) {
-        goto error;
-    }
+    get_all_file_paths_recursive_helper(folder, file_path_list, dir);
     // dir closed
     // -------------------------------------------------------------------------
     closedir(dir);
-    return;
-error:
-    closedir(dir);
-    exit(EXIT_FAILURE);
 }
 
 /**
@@ -267,22 +254,27 @@ bool load_stock_data_from_disk(
     const size_t file_count = file_data.file_count;
     stock_data_tables->tables =
         malloc(file_count * sizeof(StockDataTable));
-    stock_data_tables->table_count = file_count;
     if (stock_data_tables->tables == NULL) {
         perror("Failed to allocate stock data tables");
         exit(1);
     }
+    stock_data_tables->table_count = file_count;
 
     // Create space for the stock data
     for (size_t i = 0; i < file_count; i++) {
         StockDataTable* current_table = &stock_data_tables->tables[i];
-        current_table->rows =
-            malloc(LARGEST_STOCK_DATASET_SIZE * sizeof(StockDataRow));
-        current_table->row_count = LARGEST_STOCK_DATASET_SIZE;
-        if (current_table->rows == NULL) {
-            perror("Failed to allocate stock data rows");
-            exit(1);
+        constexpr size_t size = LARGEST_STOCK_DATASET_SIZE;
+        if (size == 0) {
+            current_table->rows = nullptr;
+        } else {
+            current_table->rows =
+                malloc(size * sizeof(StockDataRow));
+            if (current_table->rows == NULL) {
+                perror("Failed to allocate stock data rows");
+                exit(1);
+            }
         }
+        current_table->row_count = LARGEST_STOCK_DATASET_SIZE;
     }
 
     load_stock_data_from_files(
@@ -294,6 +286,6 @@ bool load_stock_data_from_disk(
 
     // filePaths freed
     // -------------------------------------------------------------------------
-    freeAllFilesPaths(&file_data);
+    free_all_files_paths(&file_data);
     return true;
 }

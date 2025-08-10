@@ -51,17 +51,17 @@ typedef struct {
     size_t data_size;
 } AllDirectionCountArrays;
 
-bool getDirectionData(
+void getDirectionData(
     StockDataTables** all_stock_data,
     AllDirectionDataArrays** all_direction_data
 );
 
-bool calculateDirectionCounts(
+void calculateDirectionCounts(
     AllDirectionDataArrays** all_direction_data,
     AllDirectionCountArrays** all_direction_counts
 );
 
-bool getProfitStreaks(
+void getProfitStreaks(
     AllDirectionDataArrays** all_direction_data,
     AllProfitStreakArrays** all_direction_streaks
 );

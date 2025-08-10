@@ -127,7 +127,7 @@ StockRanks* get_from_ranks_hash_map(
     size_t i = 0;
     const long key = hash_symbol(stock_symbol);
     while (1) {
-        const size_t index = (key + (i * i)) % RANK_MAP_SIZE;
+        const size_t index = ((size_t)key + (i * i)) % RANK_MAP_SIZE;
         StockRanks* stock_ranks = map->symbol_to_ranks[index];
         if (stock_ranks == NULL) {
             return nullptr;
@@ -140,8 +140,11 @@ StockRanks* get_from_ranks_hash_map(
 }
 
 int compare_by_low(const void* a, const void* b) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
     const ActiveStock* stock_a = ((ActiveStock*)a);
     const ActiveStock* stock_b = ((ActiveStock*)b);
+#pragma GCC diagnostic pop
     const StockDataRow* row_a =
         &stock_a->table->rows[stock_a->current_index];
     const StockDataRow* row_b =
@@ -176,8 +179,11 @@ bool is_date_less_or_equal(
 }
 
 int compare_by_date(const void* a, const void* b) {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wcast-qual"
     const StockDataRow* row_a = (*(StockDataTable**)a)->rows;
     const StockDataRow* row_b = (*(StockDataTable**)b)->rows;
+#pragma GCC diagnostic pop
 
     const uint16_t a_year = row_a->date.year;
     const uint16_t b_year = row_b->date.year;
@@ -309,6 +315,10 @@ void rank_valid_stocks_by_low(
     // -------------------------------------------------------------------------
     ActiveStock* active_stocks =
         malloc(sizeof(ActiveStock) * valid_stock_count);
+    if (active_stocks == NULL) {
+        perror("malloc failed");
+        exit(EXIT_FAILURE);
+    }
     size_t active_count = 0;
 
     // Rank stocks for every day between min date and max date
@@ -339,6 +349,7 @@ void rank_valid_stocks_by_low(
         // Use previous day if data is missing for today
         for (size_t j = 0; j < active_count; ++j) {
             ActiveStock* active_stock = &active_stocks[j];
+            assert(active_stock != NULL);
             const size_t current_index = active_stock->current_index;
             const StockDataTable* active_stock_table = active_stock->table;
             if (current_index < active_stock->table->row_count) {
@@ -402,8 +413,16 @@ void rank_valid_stocks_by_low(
             // These are freed by the caller
             stock_ranks->rank_diffs =
                 calloc(rank_data_size, sizeof(int64_t));
+            if (stock_ranks->rank_diffs == NULL) {
+                perror("calloc failed");
+                exit(EXIT_FAILURE);
+            }
             stock_ranks->went_up =
                 calloc(rank_data_size, sizeof(bool));
+            if (stock_ranks->went_up == NULL) {
+                perror("calloc failed");
+                exit(EXIT_FAILURE);
+            }
             stock_ranks->data_size = rank_data_size;
         }
     }
@@ -475,9 +494,9 @@ void rank_stocks_by_low(
  */
 uint16_t hash_symbol(const char* symbol) {
     // Hash was over 2 times faster than gpref in production testing
-    uint32_t hash = 0;
+    uint16_t hash = 0;
     for (int i = 0; symbol[i]; i++) {
-        hash = (hash << 5) ^ (symbol[i] - 'a');
+        hash = (hash << 5) ^ (uint16_t)(symbol[i] - 'a');
     }
     return hash % RANK_MAP_SIZE;
 }

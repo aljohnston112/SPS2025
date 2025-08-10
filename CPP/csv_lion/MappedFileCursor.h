@@ -22,12 +22,12 @@ static inline char* mapped_file_cursor_buf(const MappedFileCursor* self) {
     return self->currentPtr;
 }
 
-static inline size_t mapped_file_cursor_size(const MappedFileCursor* self) {
+static inline long int mapped_file_cursor_size(const MappedFileCursor* self) {
     return self->endPtr - self->currentPtr;
 }
 
 
-static inline void mapped_file_cursor_consume(MappedFileCursor* self, const size_t n) {
+static inline void mapped_file_cursor_consume(MappedFileCursor* self, const long int n) {
     self->currentPtr += (n < mapped_file_cursor_size(self)) ? n : mapped_file_cursor_size(self);
 }
 

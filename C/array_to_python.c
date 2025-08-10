@@ -1,5 +1,7 @@
 #include "array_to_python.h"
 
+#include <stdio.h>
+
 AllStockDataContainer* load_stock_data() {
 
     StockDataTables* raw_stock_data_array;
@@ -24,6 +26,10 @@ AllStockDataContainer* load_stock_data() {
     }
 
     AllStockDataContainer* stock_data_array = malloc(sizeof(AllStockDataContainer));
+    if (stock_data_array == NULL) {
+        perror("Failed to allocate memory for stock data array");
+        exit(EXIT_FAILURE);
+    }
     stock_data_array->raw_stock_data = raw_stock_data_array;
     stock_data_array->directions = all_direction_data;
     stock_data_array->direction_counts = all_direction_counts;

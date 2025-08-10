@@ -24,7 +24,7 @@ void string_spanner_init(
     char c1, char c2, char c3, char c4
 );
 
-size_t string_spanner_operator(
+int string_spanner_operator(
     const StringSpanner* self,
-    const char* buf
+    char* buf
 );

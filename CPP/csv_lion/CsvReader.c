@@ -2,9 +2,6 @@
 
 #include "MappedFileCursor.h"
 
-#ifndef WAVELET_csv_reader_H
-#define WAVELET_csv_reader_H
-
 #include "CsvCursor.h"
 
 void csv_reader_init(CsvReader* reader, MappedFileCursor* file_cursor, const char delimiter) {
@@ -38,14 +35,14 @@ int csv_reader_try_parse(CsvReader* reader) {
 
         // TODO This should be a loop
         // It is a hard limit of 32 characters
-        const size_t rc = string_spanner_operator(
+        const int rc = string_spanner_operator(
             &reader->unquoted_cell_spanner,
             currentCharacterPtr
             );
         if (rc != 16) {
             currentCharacterPtr += rc;
         } else {
-            const size_t rc2 = string_spanner_operator(
+            const int rc2 = string_spanner_operator(
                 &reader->unquoted_cell_spanner,
                 currentCharacterPtr + 16
             );
@@ -81,5 +78,3 @@ bool csv_reader_read_row(CsvReader* reader) {
 CsvCursor* csv_reader_row(CsvReader* reader) {
     return &reader->cursor;
 }
-
-#endif //WAVELET_csv_reader_H

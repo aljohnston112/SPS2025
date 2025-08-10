@@ -22,9 +22,9 @@ inline void string_spanner_init(
  *         Only the first 16 characters in string will be searched,
  *         and 16 will be returned if no match was found.
  */
-inline size_t string_spanner_operator(
+inline int string_spanner_operator(
     const StringSpanner* self,
-    const char* buf
+    char* buf
 ) {
     const char* ptr = buf;
     const char* endPtr = ptr + 16;
@@ -67,9 +67,9 @@ void string_spanner_init(
     );
 }
 
-size_t string_spanner_operator(
+int string_spanner_operator(
     const StringSpanner* self,
-    const char* buf
+    char* buf
 ) {
     return _mm_cmpistri(
         self->v_,
