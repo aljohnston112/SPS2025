@@ -795,13 +795,13 @@ void save_yearly_trees(void) {
             DAYS_PER_DIFF,
             BUY_SELL_LAG
         );
-        FILE* fd = fopen(filename, "w");
+        FILE* fd = fopen(filename, "w+");
         free(filename);
         if (fd == NULL) {
             perror("fopen failed");
             exit(1);
         }
-        export_tree_to_csv(tree, fd);
+        export_tree_to_file(tree, fd);
         fclose(fd);
 
         // tree freed

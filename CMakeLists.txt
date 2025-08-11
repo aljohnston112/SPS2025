@@ -193,6 +193,7 @@ set(
         C_tests/test_data.h
         C_tests/ranks_test.h
         C_tests/tree_test.h
+        C_tests/tree_file_util_test.h
 )
 
 set(
@@ -202,6 +203,7 @@ set(
         C_tests/csv_util_test.c
         C_tests/ranks_test.c
         C_tests/tree_test.c
+        C_tests/tree_file_util_test.c
 )
 
 add_executable(
