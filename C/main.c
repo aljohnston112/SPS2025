@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include <bits/fcntl-linux.h>
 #include <sys/time.h>
 
@@ -745,7 +746,27 @@ void save_yearly_trees(void) {
     // first year is 1964
     u_int16_t start_year = 1964;
     uint16_t end_year = start_year + 1;
-    while (start_year < 2026) {
+    while (start_year < 2025) {
+        start_year++;
+        end_year++;
+
+        char* filename;
+        asprintf(
+            &filename,
+            "%s/tree_%d_%d_%d_%d.tree",
+            TREE_DATA_FOLDER,
+            start_year,
+            DAYS_PER_DIFF,
+            BUY_SELL_LAG,
+            MAX_TREE_DEPTH
+        );
+
+        if (access(filename, F_OK) == 0) {
+            // file exists
+            free(filename);
+            continue;
+        }
+
         const bool success = load_stock_data_from_disk(
             past_stock_data_tables,
             &start_year,
@@ -755,8 +776,6 @@ void save_yearly_trees(void) {
         if (!success) {
             exit(1);
         }
-        start_year++;
-        end_year++;
 
         // past_symbol_to_ranks_map must be freed
         // ---------------------------------------------------------------------
@@ -786,15 +805,7 @@ void save_yearly_trees(void) {
         assert(tree);
         fill_tree(past_symbol_to_ranks_map, tree);
 
-        char* filename;
-        asprintf(
-            &filename,
-            "%s/tree_%d_%d_%d.csv",
-            TREE_DATA_FOLDER,
-            start_year,
-            DAYS_PER_DIFF,
-            BUY_SELL_LAG
-        );
+
         FILE* fd = fopen(filename, "w+");
         free(filename);
         if (fd == NULL) {
@@ -811,12 +822,21 @@ void save_yearly_trees(void) {
         // past_symbol_to_ranks_map freed
         // ---------------------------------------------------------------------
         free_symbol_to_ranks_hash_map(past_symbol_to_ranks_map);
-        break;
+
+        free_stock_data_tables(past_stock_data_tables);
+        past_stock_data_tables = malloc(sizeof(StockDataTables));
+        if (past_stock_data_tables == NULL) {
+            perror("malloc failed");
+            exit(EXIT_FAILURE);
+        }
+        memset(past_stock_data_tables, 0, sizeof(StockDataTables));
+        past_stock_data_tables->tables = nullptr;
+        past_stock_data_tables->table_count = 0;
     }
 
-    // past_stock_data_tables freed
-    // -------------------------------------------------------------------------
-    free_stock_data_tables(past_stock_data_tables);
+    if (past_stock_data_tables) {
+        free_stock_data_tables(past_stock_data_tables);
+    }
 }
 
 void process(void) {

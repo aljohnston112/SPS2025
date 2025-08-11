@@ -327,6 +327,7 @@ void export_tree_to_file(const TreeHashMap* root, FILE* out) {
     }
     free(node_list.nodes);
     free(node_list.depths);
+    free(offsets);
 }
 
 FixedSizeTree load_trees_from_year(const uint16_t year) {
