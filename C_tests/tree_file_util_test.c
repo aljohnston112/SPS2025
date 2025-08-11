@@ -25,8 +25,8 @@ void read_tree_matches_written_tree(void) {
     constexpr long sequence3[] = {1, 4, 3};
     add_sequence(root, sequence3, 3, went_up, window_size);
 
-    const char* test_file_name = "test_data/read_tree_matches_written_tree.test";
-    FILE* f1 = fopen(test_file_name, "w");
+    const char* test_file_name = "tree_data/read_tree_matches_written_tree.test";
+    FILE* f1 = fopen(test_file_name, "w+");
     assert(f1);
     export_tree_to_file(root, f1);
     FixedSizeTree read_tree_struct =

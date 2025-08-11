@@ -27,10 +27,10 @@ void printOpenMPVersion() {
 #endif
 
 constexpr uint16_t past_end_year = 2023;
-constexpr uint16_t past_start_year = past_end_year - 1;
+constexpr uint16_t past_start_year = past_end_year - 2;
 
 constexpr u_int16_t future_start_year = past_end_year;
-constexpr u_int16_t future_end_year = future_start_year + 2;
+constexpr u_int16_t future_end_year = future_start_year + 1;
 
 void print_promising_stocks(
     const TreeHashMap* yearly_tree,
@@ -811,6 +811,7 @@ void save_yearly_trees(void) {
         // past_symbol_to_ranks_map freed
         // ---------------------------------------------------------------------
         free_symbol_to_ranks_hash_map(past_symbol_to_ranks_map);
+        break;
     }
 
     // past_stock_data_tables freed
@@ -834,6 +835,8 @@ int main() {
     gettimeofday(&start, NULL);
 
     process();
+
+    // process_and_print_promising_stocks();
 
     gettimeofday(&stop, NULL);
     const double time_taken =
