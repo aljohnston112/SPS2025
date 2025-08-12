@@ -6,7 +6,6 @@
 #include <stdlib.h>
 
 #include "test_data.h"
-#include "../C/array_to_python.h"
 
 void read_stock_csv_loads_correct_data() {
     StockDataTable table = {

@@ -2,13 +2,13 @@
 #include <fcntl.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <bits/fcntl-linux.h>
 #include <sys/time.h>
 
 #include "file_util.h"
-#include "directions.h"
 #include "config.h"
 #include "internal_config.h"
 #include "ranks.h"
@@ -19,15 +19,16 @@
 #if IS_PARALLEL
 
 void printOpenMPVersion() {
+
 #ifdef _OPENMP
-    printf("OpenMP version: %d\n", _OPENMP);
+printf("OpenMP version: %d\n", _OPENMP);
 #else
-        printf("OpenMP is not enabled.\n");
+printf("OpenMP is not enabled.\n");
 #endif
 }
 #endif
 
-constexpr uint16_t past_end_year = 2023;
+constexpr uint16_t past_end_year = 2024;
 constexpr uint16_t past_start_year = past_end_year - 2;
 
 constexpr u_int16_t future_start_year = past_end_year;
@@ -247,7 +248,7 @@ void process_and_print_promising_stocks(void) {
     // past_stock_data_tables needs to be freed
     // -------------------------------------------------------------------------
     StockDataTables* past_stock_data_tables =
-    malloc(sizeof(StockDataTables));
+        malloc(sizeof(StockDataTables));
     if (past_stock_data_tables == NULL) {
         perror("malloc failed");
         exit(EXIT_FAILURE);
@@ -287,7 +288,8 @@ void run_backtest(
     const SymbolToRanksHashMap* all_stock_ranks
 ) {
     // Start with $1000
-    double capital = 1000.0;
+    constexpr double starting_capital = 1000.0;
+    double capital = starting_capital;
 
     double money_used_to_make_profit = 0.0;
     double profit = 0.0;
@@ -367,7 +369,8 @@ void run_backtest(
 
                         // Add it back to the capital pool
                         capital += money_from_stock_sold;
-                        profit += money_from_stock_sold;
+                        profit += (money_from_stock_sold -
+                            (open_trade.buy_price * open_trade.shares));
                         money_used_to_make_profit += (open_trade.buy_price *
                             open_trade.shares);
                         money_put_into_held_stocks -= (open_trade.buy_price *
@@ -495,13 +498,15 @@ void run_backtest(
         "    Percent of trades that resulted in profit: %.2f\n"
         "    Profit: %.2f\n"
         "    Money put into profit: %.2f\n"
-        "    Money put into held stocks: %.2f\n",
+        "    Money currently in held stocks: %.2f\n"
+        "    Percent gain: %.2f\n",
         total_trades,
         capital,
         (double)n_profit / (double)total_trades,
         profit,
         money_used_to_make_profit,
-        money_put_into_held_stocks
+        money_put_into_held_stocks,
+        capital / starting_capital
     );
 
     double current_stock_value = 0.0;
@@ -841,8 +846,8 @@ void save_yearly_trees(void) {
 
 void process(void) {
     // process_and_print_promising_stocks();
-    // prepare_data_and_run_back_test();
-    save_yearly_trees();
+    prepare_data_and_run_back_test();
+    // save_yearly_trees();
     // TreeHashMap* map = load_trees_from_year(1965);
 }
 
@@ -866,70 +871,3 @@ int main() {
 
     return 0;
 }
-
-// convert_and_plot(all_stock_ranks);
-//
-//
-// AllDirectionDataArrays* past_direction_data;
-// success = getDirectionData(
-//     &past_stock_data_array,
-//     &past_direction_data
-// );
-// if (!success) {
-//     exit(1);
-// }
-// AllProfitStreakArrays* past_direction_streak_array;
-// success = getProfitStreaks(
-//     &past_direction_data,
-//     &past_direction_streak_array
-// );
-// if (!success) {
-//     exit(1);
-// }
-//
-// HashMap* tree = create_hash_map(0);
-// for (int i = 0; i < past_direction_streak_array->data_size; i++) {
-//     const ProfitStreakArray* direction_streak_row_array =
-//         &past_direction_streak_array->profit_streaks_arrays[i];
-//     const size_t data_size = direction_streak_row_array->data_size;
-//
-//     const long* data = direction_streak_row_array->profit_streak_array;
-//     if (data_size > 2) {
-//         const size_t desired_data_length = data_size;
-//         // Skip the first 2 since the first is a boundary
-//         // and the second is a negative number
-//         // The tree root starts with a positive number
-//         add_sequence(tree, data + 2, desired_data_length - 2);
-//     }
-// }
-//
-// AllStockDataArrays* future_stock_data_array;
-//
-// constexpr u_int16_t future_end_year = 2024;
-// success = load_stock_data_from_disk(
-//     &future_stock_data_array,
-//     &future_end_year,
-//     nullptr
-// );
-// if (!success) {
-//     exit(1);
-// }
-//
-// AllDirectionDataArrays* future_direction_data;
-// success = getDirectionData(
-//     &future_stock_data_array,
-//     &future_direction_data
-// );
-// if (!success) {
-//     exit(1);
-// }
-// AllProfitStreakArrays* future_profit_streak_array;
-// success = getProfitStreaks(
-//     &future_direction_data,
-//     &future_profit_streak_array
-// );
-// if (!success) {
-//     exit(1);
-// }
-
-// print_tree(tree);

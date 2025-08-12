@@ -117,10 +117,8 @@ set(
         CPP/csv_lion/StringSpanner.c
         C/csv_util.c
         C/file_util.c
-        C/directions.c
         C/tree.c
         C/ranks.c
-        C/sequence_analyzer.c
         C/tree_file_util.c
 )
 
@@ -133,11 +131,9 @@ set(
         C/csv_util.h
         C/file_util.h
         C/internal_config.h
-        C/directions.h
         C/config.h
         C/tree.h
         C/ranks.h
-        C/sequence_analyzer.h
         C/tree_file_util.h
 )
 
@@ -255,14 +251,4 @@ if (ENABLE_COVERAGE)
     )
 endif ()
 
-add_library(
-        array_to_python SHARED
-        C/array_to_python.c
-        ${C_HEADER_FILES}
-        ${CXX_HEADER_FILES}
-        ${C_SOURCE_FILES}
-        ${CXX_SOURCE_FILES}
-)
-
-set_target_properties(array_to_python PROPERTIES LINKER_LANGUAGE C)
 

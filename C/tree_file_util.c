@@ -139,6 +139,7 @@ FixedSizeTree read_fixed_size_tree_file(const char* filename) {
     }
 
     if (st.st_size == 0) {
+        perror("File is empty");
         close(fd);
         exit(-1);
     }
@@ -200,20 +201,17 @@ static void dfs(
     const TreeHashMap* node,
     const size_t depth,
     NodeList* list,
-    size_t* max_children
+    size_t* number_of_nodes
 ) {
     add_to_node_list(list, node, depth);
-    size_t children = 0;
+    (*number_of_nodes)++;
 
     for (size_t i = 0; i < node->size; ++i) {
         const TreeHashMap* child = node->map[i];
         if (child) {
-            dfs(child, depth + 1, list, max_children);
-            children++;
+            dfs(child, depth + 1, list, number_of_nodes);
         }
     }
-
-    if (children > *max_children) *max_children = children;
 }
 
 int is_little_endian() {
@@ -228,10 +226,36 @@ void check_little_endian() {
     }
 }
 
+typedef struct {
+    uint8_t* data;
+    size_t size;
+    size_t capacity;
+} Buffer;
+
+void ensure_buffer_capacity(
+    Buffer* buffer,
+    const size_t needed
+) {
+    if (needed > buffer->capacity) {
+        size_t new_capacity = buffer->capacity ? buffer->capacity : 64;
+        while (new_capacity < needed) {
+            new_capacity *= 2;
+        }
+        uint8_t* new_data = realloc(buffer->data, new_capacity);
+        if (!new_data) {
+            perror("realloc failed");
+            exit(EXIT_FAILURE);
+        }
+        buffer->data = new_data;
+        buffer->capacity = new_capacity;
+    }
+}
+
 void export_tree_to_file(const TreeHashMap* root, FILE* out) {
     check_little_endian();
     if (!root || !out) return;
 
+    // Convert the tree to a list of nodes
     NodeList node_list = {
         .nodes = malloc(128 * sizeof(TreeHashMap*)),
         .depths = malloc(128 * sizeof(size_t)),
@@ -243,88 +267,112 @@ void export_tree_to_file(const TreeHashMap* root, FILE* out) {
         exit(EXIT_FAILURE);
     }
 
-    size_t max_children = 0;
-    dfs(root, 0, &node_list, &max_children);
+    size_t number_of_nodes = 0;
+    dfs(root, 0, &node_list, &number_of_nodes);
+
+
+    // Write nodes
+    // 40 bytes per node is a vast underestimate
+    const size_t buffer_capacity = 40 * number_of_nodes;
+    Buffer buffer = {
+        .data = malloc(buffer_capacity),
+        .size = 0,
+        .capacity = buffer_capacity
+    };
 
     size_t* offsets = calloc(node_list.count, sizeof(size_t));
     size_t current_offset = 0;
-    // Write nodes
     for (size_t i = 0; i < node_list.count; ++i) {
         offsets[i] = current_offset;
         const TreeHashMap* node = node_list.nodes[i];
         const size_t depth = node_list.depths[i];
-        fwrite(&depth, sizeof(depth), 1, out);
-        fwrite(&node->key, sizeof(node->key), 1, out);
-        fwrite(&node->count_up, sizeof(node->count_up), 1, out);
-        fwrite(&node->count_down, sizeof(node->count_down), 1, out);
-        fwrite(&node->current_size, sizeof(node->current_size), 1, out);
+
+        ensure_buffer_capacity(
+            &buffer,
+            current_offset +
+            sizeof(depth) +
+            sizeof(node->key) +
+            sizeof(node->count_up) +
+            sizeof(node->count_down) +
+            sizeof(node->current_size)
+        );
+
+        memcpy(&buffer.data[current_offset], &depth, sizeof(depth));
+        current_offset += sizeof(depth);
+        memcpy(&buffer.data[current_offset], &node->key, sizeof(node->key));
+        current_offset += sizeof(node->key);
+        memcpy(
+            &buffer.data[current_offset],
+            &node->count_up,
+            sizeof(node->count_up)
+        );
+        current_offset += sizeof(node->count_up);
+        memcpy(
+            &buffer.data[current_offset],
+            &node->count_down,
+            sizeof(node->count_down)
+        );
+        current_offset += sizeof(node->count_down);
+        memcpy(
+            &buffer.data[current_offset],
+            &node->current_size,
+            sizeof(node->current_size)
+        );
+        current_offset += sizeof(node->current_size);
+        buffer.size = current_offset;
+
 
         // Write child indices
-        size_t written = 0;
         for (size_t j = 0; j < node->size; ++j) {
             const TreeHashMap* child = node->map[j];
             if (child) {
                 for (size_t k = 0; k < node_list.count; ++k) {
                     if (node_list.nodes[k] == child) {
-                        fwrite(&child->key, sizeof(child->key), 1, out);
-                        fwrite(&k, sizeof(k), 1, out);
+                        ensure_buffer_capacity(
+                            &buffer,
+                            current_offset +
+                            sizeof(child->key) +
+                            sizeof(k)
+                        );
+                        memcpy(
+                            &buffer.data[current_offset],
+                            &child->key,
+                            sizeof(child->key)
+                        );
+                        current_offset += sizeof(child->key);
+                        memcpy(
+                            &buffer.data[current_offset],
+                            &k,
+                            sizeof(k)
+                        );
+                        current_offset += sizeof(k);
+                        buffer.size = current_offset;
                         break;
                     }
                 }
-                written++;
             }
         }
-        current_offset +=
-            sizeof(depth) +
-            sizeof(node->key) +
-            sizeof(node->count_up) +
-            sizeof(node->count_down) +
-            sizeof(node->current_size) +
-            (written * (sizeof(size_t) + sizeof(long)));
     }
-    fflush(out);
-    fseek(out, 0, SEEK_SET);
     current_offset = 0;
     for (size_t i = 0; i < node_list.count; ++i) {
         current_offset += sizeof(node_list.depths[i]) +
             sizeof(node_list.nodes[i]->key) +
             sizeof(node_list.nodes[i]->count_up) +
             sizeof(node_list.nodes[i]->count_down);
-        fseek(out, current_offset, SEEK_SET);
-        uint64_t current_size;
-        current_offset += fread(
-            &current_size,
-            sizeof(current_size),
-            1,
-            out
-        ) * sizeof(current_size);
+        const uint64_t current_size =
+           *(u_int64_t*)(buffer.data + current_offset);
+        current_offset += sizeof(current_size);
         for (uint64_t j = 0; j < current_size; j++) {
-            size_t child_key;
-            current_offset += fread(
-                &child_key,
-                sizeof(child_key),
-                1,
-                out
-            ) * sizeof(child_key);
-
-            size_t child_index;
-            fread(
-                &child_index,
-                sizeof(child_index),
-                1,
-                out
-            );
-            fseek(out, -sizeof(child_index), SEEK_CUR);
-            current_offset +=
-                fwrite(
-                    &(offsets[child_index]),
-                    sizeof(offsets[child_index]),
-                    1,
-                    out
-                ) * sizeof(offsets[child_index]);
-            fflush(out);
+            // Skip the child key
+            current_offset += sizeof(size_t);
+            const size_t child_index = *((size_t*)(buffer.data + current_offset));
+            (*(size_t*)(buffer.data + current_offset)) = offsets[child_index];
+            current_offset += sizeof(child_index);
         }
     }
+    fwrite(buffer.data, 1, buffer.size, out);
+    fflush(out);
+    free(buffer.data);
     free(node_list.nodes);
     free(node_list.depths);
     free(offsets);
@@ -362,7 +410,9 @@ FixedSizeTree load_trees_from_year(const uint16_t year) {
         }
     }
 
-    FixedSizeTree tree = read_fixed_size_tree_file(tree_file_path);
+    const FixedSizeTree tree = read_fixed_size_tree_file(tree_file_path);
     free_all_files_paths(&file_data);
     return tree;
 }
+
+void print_bounds_on_trees(const uint64_t depth) {}

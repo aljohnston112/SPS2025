@@ -187,14 +187,15 @@ void resize_hash_map(TreeHashMap* map) {
             TreeHashMap* old_child = old_map[i];
             size_t j = 0;
             // slot is occupied
-            while (map->map[((size_t)old_child->key + (j * j)) % map->size]
-                !=
-                NULL) {
+            while (
+                map->map[((size_t)old_child->key + (j * j)) % map->size] !=
+                NULL
+            ) {
                 j++;
             }
             // found a spot to put the key, put it in the map
-            const size_t index = ((size_t)old_child->key + (j * j)) % map->
-                size;
+            const size_t index =
+                ((size_t)old_child->key + (j * j)) % map->size;
 
             map->map[index] = old_child;
             map->current_size++;
