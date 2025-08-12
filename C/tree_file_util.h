@@ -21,10 +21,12 @@ char* get_child_with_key(char* root, const char* node, long child_key);
 
 FixedSizeTree read_fixed_size_tree_file(const char* filename);
 
-FixedSizeTree load_trees_from_year(uint16_t year);
+FixedSizeTree load_tree_from_year(uint16_t year);
 
 void export_tree_to_file(const TreeHashMap* root, FILE* out);
 
 void free_fixed_size_tree(FixedSizeTree* tree);
+
+void print_bounds_on_trees();
 
 #endif //TREE_FILE_UTIL_H

@@ -360,12 +360,13 @@ void export_tree_to_file(const TreeHashMap* root, FILE* out) {
             sizeof(node_list.nodes[i]->count_up) +
             sizeof(node_list.nodes[i]->count_down);
         const uint64_t current_size =
-           *(u_int64_t*)(buffer.data + current_offset);
+            *(u_int64_t*)(buffer.data + current_offset);
         current_offset += sizeof(current_size);
         for (uint64_t j = 0; j < current_size; j++) {
             // Skip the child key
             current_offset += sizeof(size_t);
-            const size_t child_index = *((size_t*)(buffer.data + current_offset));
+            const size_t child_index =
+                *((size_t*)(buffer.data + current_offset));
             (*(size_t*)(buffer.data + current_offset)) = offsets[child_index];
             current_offset += sizeof(child_index);
         }
@@ -378,7 +379,7 @@ void export_tree_to_file(const TreeHashMap* root, FILE* out) {
     free(offsets);
 }
 
-FixedSizeTree load_trees_from_year(const uint16_t year) {
+FixedSizeTree load_tree_from_year(const uint16_t year) {
     // filePaths must be freed
     // -------------------------------------------------------------------------
     FilePathList file_data;
@@ -411,8 +412,89 @@ FixedSizeTree load_trees_from_year(const uint16_t year) {
     }
 
     const FixedSizeTree tree = read_fixed_size_tree_file(tree_file_path);
+
+    // filePaths  freed
+    // -------------------------------------------------------------------------
     free_all_files_paths(&file_data);
     return tree;
 }
 
-void print_bounds_on_trees(const uint64_t depth) {}
+uint64_t get_number_of_nodes(const char* tree) {
+    const uint64_t number_of_children = get_number_of_children(tree);
+    uint64_t number_of_nodes = 1;
+    const char* start_offset =
+        tree +
+        sizeof(size_t) +
+        sizeof(long) +
+        sizeof(uint64_t) +
+        sizeof(uint64_t) +
+        sizeof(uint64_t);
+    for (uint64_t child_index = 0;
+         child_index < number_of_children;
+         child_index++
+    ) {
+        const char* key_address =
+            start_offset +
+            (child_index * (sizeof(long) + sizeof(size_t)));
+        const char* child_address = key_address + sizeof(long);
+        number_of_nodes +=
+            get_number_of_nodes(tree + (*(size_t*)child_address));
+    }
+    return number_of_nodes;
+}
+
+uint64_t get_max_node_size(char* tree) {
+    const uint64_t number_of_children = get_number_of_children(tree);
+    uint64_t number_of_bytes =
+        sizeof(size_t) +
+        sizeof(long) +
+        sizeof(uint64_t) +
+        sizeof(uint64_t) +
+        sizeof(uint64_t) +
+        (number_of_children * (sizeof(long) + sizeof(size_t)));
+    const char* start_offset =
+        tree +
+        sizeof(size_t) +
+        sizeof(long) +
+        sizeof(uint64_t) +
+        sizeof(uint64_t) +
+        sizeof(uint64_t);
+    for (uint64_t child_index = 0;
+         child_index < number_of_children;
+         child_index++
+    ) {
+        const char* key_address =
+            start_offset +
+            (child_index * (sizeof(long) + sizeof(size_t)));
+        const char* child_address = key_address + sizeof(long);
+        const uint64_t child_number_of_bytes =
+            get_max_node_size(tree + (*(size_t*)child_address));
+        if (child_number_of_bytes > number_of_bytes) {
+            number_of_bytes = child_number_of_bytes;
+        }
+    }
+    return number_of_bytes;
+}
+
+void print_bounds_on_trees() {
+    for (size_t year = START_YEAR; year < END_YEAR; year++) {
+        // tree must be freed
+        // ---------------------------------------------------------------------
+        FixedSizeTree tree = load_tree_from_year(year);
+        printf(
+            "Number of nodes for %lu: %lu\n",
+            year,
+            get_number_of_nodes(tree.start)
+        );
+
+        printf(
+            "Max node size for %lu: %lu\n",
+            year,
+            get_max_node_size(tree.start)
+        );
+
+        // tree freed
+        // ---------------------------------------------------------------------
+        free_fixed_size_tree(&tree);
+    }
+}

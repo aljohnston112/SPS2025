@@ -28,7 +28,7 @@ printf("OpenMP is not enabled.\n");
 }
 #endif
 
-constexpr uint16_t past_end_year = 2024;
+constexpr uint16_t past_end_year = 2023;
 constexpr uint16_t past_start_year = past_end_year - 2;
 
 constexpr u_int16_t future_start_year = past_end_year;
@@ -846,8 +846,9 @@ void save_yearly_trees(void) {
 
 void process(void) {
     // process_and_print_promising_stocks();
-    prepare_data_and_run_back_test();
+    // prepare_data_and_run_back_test();
     // save_yearly_trees();
+    print_bounds_on_trees();
     // TreeHashMap* map = load_trees_from_year(1965);
 }
 
@@ -860,8 +861,6 @@ int main() {
     gettimeofday(&start, NULL);
 
     process();
-
-    // process_and_print_promising_stocks();
 
     gettimeofday(&stop, NULL);
     const double time_taken =
