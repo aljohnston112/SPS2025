@@ -19,11 +19,10 @@
 #if IS_PARALLEL
 
 void printOpenMPVersion() {
-
 #ifdef _OPENMP
-printf("OpenMP version: %d\n", _OPENMP);
+    printf("OpenMP version: %d\n", _OPENMP);
 #else
-printf("OpenMP is not enabled.\n");
+    printf("OpenMP is not enabled.\n");
 #endif
 }
 #endif
@@ -293,7 +292,7 @@ void run_backtest(
 
     double money_used_to_make_profit = 0.0;
     double profit = 0.0;
-    double money_put_into_held_stocks = 0.0;
+    double money_currently_in_held_stocks = 0.0;
 
     // Track how many trades happen and how many profit
     size_t total_trades = 0;
@@ -327,7 +326,10 @@ void run_backtest(
         perror("calloc failed");
         exit(EXIT_FAILURE);
     }
-    size_t* bail_days = calloc(all_stock_ranks->count, sizeof(size_t));
+    size_t* bail_days = calloc(
+        all_stock_ranks->count,
+        sizeof(size_t)
+    );
     if (bail_days == NULL) {
         perror("calloc failed");
         exit(EXIT_FAILURE);
@@ -341,12 +343,13 @@ void run_backtest(
     ) {
         // Go through all stocks
         for (size_t j = 0; j < all_stock_ranks->count; j++) {
-            // This is future data
-            const StockRanks* stock_ranks =
+            const StockRanks* future_stock_ranks =
                 all_stock_ranks->symbol_to_ranks[j];
 
             // If the stock has enough data
-            if (stock_ranks && stock_ranks->data_size > BUY_SELL_LAG) {
+            if (future_stock_ranks &&
+                future_stock_ranks->data_size > BUY_SELL_LAG
+            ) {
                 // Go through every day in the data minus room to check for a sale
 
                 // Bail out if we decided to bail earlier
@@ -369,12 +372,13 @@ void run_backtest(
 
                         // Add it back to the capital pool
                         capital += money_from_stock_sold;
+
+                        const double money_put_into_stock =
+                            (open_trade.buy_price * open_trade.shares);
                         profit += (money_from_stock_sold -
-                            (open_trade.buy_price * open_trade.shares));
-                        money_used_to_make_profit += (open_trade.buy_price *
-                            open_trade.shares);
-                        money_put_into_held_stocks -= (open_trade.buy_price *
-                            open_trade.shares);
+                            money_put_into_stock);
+                        money_used_to_make_profit += money_put_into_stock;
+                        money_currently_in_held_stocks -= money_put_into_stock;
                         total_trades++;
 
                         // And remove it from memory
@@ -406,7 +410,7 @@ void run_backtest(
 
                 // Get that data and ask the tree whether it thinks we should buy
                 const long* past_sequence =
-                    &stock_ranks->rank_diffs[0 + (i - sequence_length)];
+                    &future_stock_ranks->rank_diffs[0 + (i - sequence_length)];
                 double prediction = 0.0;
                 size_t depth = 0;
                 get_prediction_from_hash_map(
@@ -419,28 +423,28 @@ void run_backtest(
 
                 // If the tree says we should buy and there is room to sell
                 if (prediction > PREDICTION_THRESHOLD &&
-                    i + 1 + BUY_SELL_LAG < stock_ranks->data_size &&
-                    i + 1 + BUY_SELL_LAG > i
+                    i + 1 + BUY_SELL_LAG < future_stock_ranks->data_size
                 ) {
                     // Only consider stocks under some price
-                    const double buy_price = stock_ranks->high_per_day[i + 1];
+                    const double buy_price =
+                        future_stock_ranks->high_per_day[i + 1];
                     if (buy_price < 1) {
                         // Assume default sell date
                         uint64_t sell_day = 1 + i + BUY_SELL_LAG;
                         double sell_price = -1.0;
 
-                        // But see if we can sell earlier for 50% profit,
-                        // hold until 50% profit
+                        // But see if we can sell earlier for profit,
+                        // hold until profit,
                         // or wait til the stock reaches last stock day
                         for (size_t day = i + 2;
-                             day < stock_ranks->data_size;
+                             day < future_stock_ranks->data_size;
                              day++
                         ) {
-                            // Definitely want to sell if stock reached 50%
-                            if (stock_ranks->low_per_day[day] >=
+                            if (future_stock_ranks->low_per_day[day] >=
                                 buy_price * 2
                             ) {
-                                sell_price = stock_ranks->low_per_day[day];
+                                sell_price =
+                                    future_stock_ranks->low_per_day[day];
                                 sell_day = day;
                                 break;
                             }
@@ -450,7 +454,10 @@ void run_backtest(
 #pragma GCC diagnostic ignored "-Wfloat-equal"
                         if (sell_price == -1.0) {
 #pragma GCC diagnostic pop
-                            sell_price = 0;
+                            sell_price = future_stock_ranks->low_per_day[
+                                future_stock_ranks->data_size - 1
+                            ];
+                            sell_day = future_stock_ranks->data_size - 1;
                         }
 
                         // For tracking how many trades were a profit
@@ -458,7 +465,8 @@ void run_backtest(
                             n_profit++;
                         }
 
-                        // Take 1% of the current capital and use it to buy the stock
+                        // Take a portion of the current capital and
+                        // use it to buy the stock
                         const double spent = capital * 0.1;
                         open_trades[num_open_trades++] = (OpenTrade){
                             .buy_price = buy_price,
@@ -468,13 +476,13 @@ void run_backtest(
                             .sell_price = sell_price
                         };
                         capital -= spent;
-                        money_put_into_held_stocks += spent;
+                        money_currently_in_held_stocks += spent;
 
                         // If the trade resulted in a loss, do not consider it again
                         if (sell_price < buy_price && !bailed[j]) {
                             printf(
                                 "%s\n",
-                                stock_ranks->stock_symbol
+                                future_stock_ranks->stock_symbol
                                 //"Bailing on stock: %s after selling for %.2f\n",
                                 // stock_ranks->stock_symbol,
                                 // (sell_price / buy_price)
@@ -497,7 +505,7 @@ void run_backtest(
         "    Capital: %.2f\n"
         "    Percent of trades that resulted in profit: %.2f\n"
         "    Profit: %.2f\n"
-        "    Money put into profit: %.2f\n"
+        "    Money used to make profit: %.2f\n"
         "    Money currently in held stocks: %.2f\n"
         "    Percent gain: %.2f\n",
         total_trades,
@@ -505,7 +513,7 @@ void run_backtest(
         (double)n_profit / (double)total_trades,
         profit,
         money_used_to_make_profit,
-        money_put_into_held_stocks,
+        money_currently_in_held_stocks,
         capital / starting_capital
     );
 
@@ -710,7 +718,8 @@ void create_diffs_and_run_back_test(
 void prepare_data_and_run_back_test() {
     // past_stock_data_tables needs to be freed
     // -------------------------------------------------------------------------
-    StockDataTables* past_stock_data_tables = malloc(sizeof(StockDataTables));
+    StockDataTables* past_stock_data_tables =
+        malloc(sizeof(StockDataTables));
     if (past_stock_data_tables == NULL) {
         perror("malloc failed");
         exit(EXIT_FAILURE);
@@ -846,9 +855,9 @@ void save_yearly_trees(void) {
 
 void process(void) {
     // process_and_print_promising_stocks();
-    // prepare_data_and_run_back_test();
+    prepare_data_and_run_back_test();
     // save_yearly_trees();
-    print_bounds_on_trees();
+    // print_bounds_on_trees();
     // TreeHashMap* map = load_trees_from_year(1965);
 }
 
