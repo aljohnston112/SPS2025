@@ -12,9 +12,12 @@
 #define RANK_MAP_SIZE 22717
 
 
-#define BUY_SELL_LAG 5
 #define DAYS_PER_DIFF 1
-#define MAX_TREE_DEPTH 10
+#define BUY_SELL_LAG 5
+#define MAX_TREE_DEPTH 1
+
+#define START_YEAR 1965
+#define END_YEAR 2026
 
 #define PREDICTION_THRESHOLD 0.5
 #endif //CONFIG_H
