@@ -10,7 +10,8 @@
 void read_stock_csv_loads_correct_data() {
     StockDataTable table = {
         .rows = malloc(ROWS_IN_TEST_FILE * (sizeof(StockDataRow))),
-        .row_count = 0
+        .row_count = 0,
+        .capacity = ROWS_IN_TEST_FILE
     };
     assert(table.rows);
     read_stock_csv(
@@ -27,7 +28,8 @@ void read_stock_csv_loads_correct_data() {
 void read_stock_csv_with_start_date_loads_correct_data() {
     StockDataTable table = {
         .rows = malloc(ROWS_IN_TEST_FILE * (sizeof(StockDataRow))),
-        .row_count = 0
+        .row_count = 0,
+        .capacity = ROWS_IN_TEST_FILE
     };
     assert(table.rows);
     constexpr uint16_t start = 2000;
@@ -40,7 +42,8 @@ void read_stock_csv_with_start_date_loads_correct_data() {
 void read_stock_csv_with_end_date_loads_correct_data() {
     StockDataTable table = {
         .rows = malloc(ROWS_IN_TEST_FILE * (sizeof(StockDataRow))),
-        .row_count = 0
+        .row_count = 0,
+        .capacity = ROWS_IN_TEST_FILE
     };
     assert(table.rows);
     constexpr uint16_t end = 2001;
@@ -54,7 +57,8 @@ void read_stock_csv_with_end_date_loads_correct_data() {
 void read_stock_csv_with_start_and_end_date_loads_correct_data() {
     StockDataTable table = {
         .rows = malloc(ROWS_IN_TEST_FILE * (sizeof(StockDataRow))),
-        .row_count = 0
+        .row_count = 0,
+        .capacity = ROWS_IN_TEST_FILE
     };
     assert(table.rows);
     constexpr uint16_t start = 2000;

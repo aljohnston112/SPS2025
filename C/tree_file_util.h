@@ -1,6 +1,9 @@
 #ifndef TREE_FILE_UTIL_H
 #define TREE_FILE_UTIL_H
-#include "tree.h"
+
+#include <stdio.h>
+
+#include "sequence_counting_trie.h"
 
 typedef struct {
     char* start;
@@ -23,7 +26,7 @@ FixedSizeTree read_fixed_size_tree_file(const char* filename);
 
 FixedSizeTree load_tree_from_year(uint16_t year);
 
-void export_tree_to_file(const TreeHashMap* root, FILE* out);
+void export_tree_to_file(const SequenceCountingTrie* root, FILE* out);
 
 void free_fixed_size_tree(FixedSizeTree* tree);
 

@@ -1,13 +1,62 @@
 #ifndef TREE_H
 #define TREE_H
 
-#include <sys/types.h>
-#include <stdio.h>
-
-#include "ranks.h"
+#include <stddef.h>
+#include <stdint.h>
 
 #define MAX_INDEX 2048
 #define START_MAP_SIZE 61
+
+/**
+ * A sequence-counting trie.
+ */
+typedef struct SequenceCountTrie SequenceCountingTrie;
+
+struct SequenceCountTrie {
+    SequenceCountingTrie** map;
+    uint64_t capacity;
+    uint64_t current_size;
+    long key;
+    uint64_t count_up;
+    uint64_t count_down;
+};
+
+SequenceCountingTrie* create_sequence_counting_trie(long key);
+
+SequenceCountingTrie* add_to_trie_or_get(SequenceCountingTrie* trie, long key);
+
+void add_subsequence_to_trie(
+    SequenceCountingTrie* parent_trie,
+    const long* key_sequence,
+    size_t sequence_length,
+    bool went_up
+);
+
+void add_sequence_to_trie(
+    SequenceCountingTrie* trie,
+    const long* sequence,
+    size_t sequence_length,
+    const bool* went_up,
+    size_t window_size
+);
+
+SequenceCountingTrie* get_from_trie(const SequenceCountingTrie* trie, long key);
+
+void get_prediction_from_trie(
+    const SequenceCountingTrie* trie,
+    const long* past_sequence,
+    size_t sequence_length,
+    double* prediction,
+    size_t* depth
+);
+
+void resize_trie_map(SequenceCountingTrie* trie);
+
+void print_trie(const SequenceCountingTrie* trie);
+
+void free_trie(SequenceCountingTrie* trie);
+
+bool is_prime(size_t value);
 
 static const size_t primes[] = {
     2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
@@ -872,53 +921,5 @@ static const size_t primes[] = {
     99787, 99793, 99809, 99817, 99823, 99829, 99833, 99839, 99859, 99871, 99877,
     99881, 99901, 99907, 99923, 99929, 99961, 99971, 99989, 99991
 };
-
-typedef struct TreeHashMap TreeHashMap;
-
-struct TreeHashMap {
-    TreeHashMap** map;
-    uint64_t size;
-    uint64_t current_size;
-    long key;
-    uint64_t count_up;
-    uint64_t count_down;
-};
-
-void get_prediction_from_hash_map(
-    const TreeHashMap* map,
-    const long* past_sequence,
-    size_t sequence_length,
-    double* prediction,
-    size_t* depth
-);
-
-void print_tree(const TreeHashMap* root);
-
-void free_tree(TreeHashMap* root);
-
-TreeHashMap* get_from_tree_hash_map(const TreeHashMap* map, long key);
-
-bool is_prime(size_t value);
-
-void resize_hash_map(TreeHashMap* map);
-
-TreeHashMap* add_to_hash_map_or_get(TreeHashMap* map, long key);
-
-void add_subsequence(
-    TreeHashMap* parent,
-    const long* sequence,
-    size_t sequence_length,
-    bool went_up
-);
-
-void add_sequence(
-    TreeHashMap* root,
-    const long* sequence,
-    size_t sequence_length,
-    const bool* went_up,
-    size_t window_size
-);
-
-TreeHashMap* create_tree_hash_map(long key);
 
 #endif //TREE_H

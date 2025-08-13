@@ -12,7 +12,7 @@
 #include "config.h"
 #include "internal_config.h"
 #include "ranks.h"
-#include "tree.h"
+#include "sequence_counting_trie.h"
 #include "tree_file_util.h"
 #include "../CPP/grapher.h"
 
@@ -34,7 +34,7 @@ constexpr u_int16_t future_start_year = past_end_year;
 constexpr u_int16_t future_end_year = future_start_year + 1;
 
 void print_promising_stocks(
-    const TreeHashMap* yearly_tree,
+    const SequenceCountingTrie* yearly_tree,
     const SymbolToRanksHashMap* all_stock_ranks
 ) {
     constexpr size_t required_data_size =
@@ -43,21 +43,21 @@ void print_promising_stocks(
 
     for (size_t j = 0; j < all_stock_ranks->count; j++) {
         const StockRanks* stock_ranks = all_stock_ranks->symbol_to_ranks[j];
-        if (!stock_ranks || stock_ranks->data_size < required_data_size) {
+        if (!stock_ranks || stock_ranks->capacity < required_data_size) {
             continue;
         }
         const size_t sequence_length =
-            stock_ranks->data_size < MAX_TREE_DEPTH
-                ? stock_ranks->data_size
+            stock_ranks->capacity < MAX_TREE_DEPTH
+                ? stock_ranks->capacity
                 : MAX_TREE_DEPTH;
 
         const long* past_sequence = &stock_ranks->rank_diffs[
-            stock_ranks->data_size - sequence_length
+            stock_ranks->capacity - sequence_length
         ];
 
         double prediction = 0.0;
         size_t depth = 0;
-        get_prediction_from_hash_map(
+        get_prediction_from_trie(
             yearly_tree,
             past_sequence,
             sequence_length,
@@ -76,7 +76,7 @@ void print_promising_stocks(
 }
 
 void create_future_diffs_and_print_promising_stocks(
-    const TreeHashMap* tree,
+    const SequenceCountingTrie* tree,
     const StockDataTables* future_stock_data_tables
 ) {
     // future_stock_ranks needs to be freed
@@ -113,7 +113,7 @@ void create_future_diffs_and_print_promising_stocks(
 }
 
 void load_future_data_then_create_future_diffs_and_print_promising_stocks(
-    const TreeHashMap* tree
+    const SequenceCountingTrie* tree
 ) {
     // future_stock_data_tables needs to be freed
     // -------------------------------------------------------------------------
@@ -126,6 +126,7 @@ void load_future_data_then_create_future_diffs_and_print_promising_stocks(
     memset(future_stock_data_tables, 0, sizeof(StockDataTables));
     future_stock_data_tables->tables = nullptr;
     future_stock_data_tables->table_count = 0;
+    future_stock_data_tables->capacity = 0;
 
     constexpr uint16_t start_year = 2025;
     const bool success = load_stock_data_from_disk(
@@ -160,7 +161,7 @@ void load_future_data_then_create_future_diffs_and_print_promising_stocks(
  */
 void fill_tree(
     const SymbolToRanksHashMap* symbol_to_ranks_map,
-    TreeHashMap* tree
+    SequenceCountingTrie* tree
 ) {
     // (the diff size) + (the day after_diff) + (the price lag)
     constexpr size_t required_data_size =
@@ -170,7 +171,7 @@ void fill_tree(
         const StockRanks* stock_ranks =
             symbol_to_ranks_map->symbol_to_ranks[j];
         if (stock_ranks) {
-            const size_t data_size = stock_ranks->data_size;
+            const size_t data_size = stock_ranks->capacity;
             const size_t desired_data_length = data_size;
             const size_t actual_data_size = data_size < desired_data_length
                                                 ? data_size
@@ -180,7 +181,7 @@ void fill_tree(
                      i < actual_data_size - BUY_SELL_LAG - 1;
                      i++
                 ) {
-                    add_sequence(
+                    add_sequence_to_trie(
                         tree,
                         stock_ranks->rank_diffs + i,
                         // 1 and buy_sell_lag are because no data is generated past that
@@ -200,13 +201,13 @@ void create_past_tree_then_create_future_diffs_and_print_promising_stocks(
 ) {
     // tree needs to be freed
     // -------------------------------------------------------------------------
-    TreeHashMap* tree = create_tree_hash_map(0);
+    SequenceCountingTrie* tree = create_sequence_counting_trie(0);
     fill_tree(past_symbol_to_ranks_map, tree);
     load_future_data_then_create_future_diffs_and_print_promising_stocks(tree);
 
     // tree freed
     // -------------------------------------------------------------------------
-    free_tree(tree);
+    free_trie(tree);
 }
 
 void create_diffs_and_print_promising_stocks(
@@ -255,6 +256,7 @@ void process_and_print_promising_stocks(void) {
     memset(past_stock_data_tables, 0, sizeof(StockDataTables));
     past_stock_data_tables->tables = nullptr;
     past_stock_data_tables->table_count = 0;
+    past_stock_data_tables->capacity = 0;
 
     constexpr uint16_t start = 2024;
     constexpr uint16_t end = 2025;
@@ -283,7 +285,7 @@ typedef struct {
 } OpenTrade;
 
 void run_backtest(
-    const TreeHashMap* yearly_tree,
+    const SequenceCountingTrie* yearly_tree,
     const SymbolToRanksHashMap* all_stock_ranks
 ) {
     // Start with $1000
@@ -315,8 +317,8 @@ void run_backtest(
     size_t max_days = 0;
     for (size_t j = 0; j < all_stock_ranks->count; j++) {
         const StockRanks* stock = all_stock_ranks->symbol_to_ranks[j];
-        if (stock && stock->data_size > max_days) {
-            max_days = stock->data_size;
+        if (stock && stock->capacity > max_days) {
+            max_days = stock->capacity;
         }
     }
 
@@ -348,7 +350,7 @@ void run_backtest(
 
             // If the stock has enough data
             if (future_stock_ranks &&
-                future_stock_ranks->data_size > BUY_SELL_LAG
+                future_stock_ranks->capacity > BUY_SELL_LAG
             ) {
                 // Go through every day in the data minus room to check for a sale
 
@@ -413,7 +415,7 @@ void run_backtest(
                     &future_stock_ranks->rank_diffs[0 + (i - sequence_length)];
                 double prediction = 0.0;
                 size_t depth = 0;
-                get_prediction_from_hash_map(
+                get_prediction_from_trie(
                     yearly_tree,
                     past_sequence,
                     sequence_length,
@@ -423,7 +425,7 @@ void run_backtest(
 
                 // If the tree says we should buy and there is room to sell
                 if (prediction > PREDICTION_THRESHOLD &&
-                    i + 1 + BUY_SELL_LAG < future_stock_ranks->data_size
+                    i + 1 + BUY_SELL_LAG < future_stock_ranks->capacity
                 ) {
                     // Only consider stocks under some price
                     const double buy_price =
@@ -437,7 +439,7 @@ void run_backtest(
                         // hold until profit,
                         // or wait til the stock reaches last stock day
                         for (size_t day = i + 2;
-                             day < future_stock_ranks->data_size;
+                             day < future_stock_ranks->capacity;
                              day++
                         ) {
                             if (future_stock_ranks->low_per_day[day] >=
@@ -455,9 +457,9 @@ void run_backtest(
                         if (sell_price == -1.0) {
 #pragma GCC diagnostic pop
                             sell_price = future_stock_ranks->low_per_day[
-                                future_stock_ranks->data_size - 1
+                                future_stock_ranks->capacity - 1
                             ];
-                            sell_day = future_stock_ranks->data_size - 1;
+                            sell_day = future_stock_ranks->capacity - 1;
                         }
 
                         // For tracking how many trades were a profit
@@ -545,7 +547,7 @@ void run_backtest(
 }
 
 void create_future_diffs_and_run_back_test(
-    const TreeHashMap* tree,
+    const SequenceCountingTrie* tree,
     const StockDataTables* future_stock_data_tables
 ) {
     // future_stock_ranks needs to be freed
@@ -581,7 +583,7 @@ void create_future_diffs_and_run_back_test(
 }
 
 void load_future_data_then_create_future_diffs_and_run_back_test(
-    const TreeHashMap* tree
+    const SequenceCountingTrie* tree
 ) {
     // future_stock_data_tables needs to be freed
     // -------------------------------------------------------------------------
@@ -594,6 +596,7 @@ void load_future_data_then_create_future_diffs_and_run_back_test(
     memset(future_stock_data_tables, 0, sizeof(StockDataTables));
     future_stock_data_tables->tables = nullptr;
     future_stock_data_tables->table_count = 0;
+    future_stock_data_tables->capacity = 0;
 
     const bool success = load_stock_data_from_disk(
         future_stock_data_tables,
@@ -617,14 +620,14 @@ void create_past_tree_then_create_future_diffs_and_run_back_test(
 ) {
     // tree needs to be freed
     // -------------------------------------------------------------------------
-    TreeHashMap* tree = create_tree_hash_map(0);
+    SequenceCountingTrie* tree = create_sequence_counting_trie(0);
     fill_tree(past_symbol_to_ranks_map, tree);
     // print_tree(tree);
     load_future_data_then_create_future_diffs_and_run_back_test(tree);
 
     // tree freed
     // -------------------------------------------------------------------------
-    free_tree(tree);
+    free_trie(tree);
 }
 
 void print_stats(const SymbolToRanksHashMap* past_symbol_to_ranks_map) {
@@ -639,7 +642,7 @@ void print_stats(const SymbolToRanksHashMap* past_symbol_to_ranks_map) {
         const StockRanks* stock_ranks =
             past_symbol_to_ranks_map->symbol_to_ranks[j];
         if (stock_ranks) {
-            const size_t data_size = stock_ranks->data_size;
+            const size_t data_size = stock_ranks->capacity;
             if (data_size > max_data_size) {
                 max_data_size = data_size;
             }
@@ -659,7 +662,7 @@ void print_stats(const SymbolToRanksHashMap* past_symbol_to_ranks_map) {
         const StockRanks* stock_ranks =
             past_symbol_to_ranks_map->symbol_to_ranks[j];
         if (stock_ranks) {
-            const size_t data_size = stock_ranks->data_size;
+            const size_t data_size = stock_ranks->capacity;
             if (data_size >= required_data_size) {
                 for (size_t i = DAYS_PER_DIFF;
                      // (the data size) - (the day after a diff) - (the price lag)
@@ -727,6 +730,7 @@ void prepare_data_and_run_back_test() {
     memset(past_stock_data_tables, 0, sizeof(StockDataTables));
     past_stock_data_tables->tables = nullptr;
     past_stock_data_tables->table_count = 0;
+    past_stock_data_tables->capacity = 0;
 
     const bool success = load_stock_data_from_disk(
         past_stock_data_tables,
@@ -755,6 +759,7 @@ void save_yearly_trees(void) {
     }
     memset(past_stock_data_tables, 0, sizeof(StockDataTables));
     past_stock_data_tables->tables = nullptr;
+    past_stock_data_tables->table_count = 0;
     past_stock_data_tables->table_count = 0;
 
     // first year is 1964
@@ -815,7 +820,7 @@ void save_yearly_trees(void) {
 
         // tree needs to be freed
         // ---------------------------------------------------------------------
-        TreeHashMap* tree = create_tree_hash_map(0);
+        SequenceCountingTrie* tree = create_sequence_counting_trie(0);
         assert(tree);
         fill_tree(past_symbol_to_ranks_map, tree);
 
@@ -831,7 +836,7 @@ void save_yearly_trees(void) {
 
         // tree freed
         // ---------------------------------------------------------------------
-        free_tree(tree);
+        free_trie(tree);
 
         // past_symbol_to_ranks_map freed
         // ---------------------------------------------------------------------
@@ -846,6 +851,7 @@ void save_yearly_trees(void) {
         memset(past_stock_data_tables, 0, sizeof(StockDataTables));
         past_stock_data_tables->tables = nullptr;
         past_stock_data_tables->table_count = 0;
+        past_stock_data_tables->capacity = 0;
     }
 
     if (past_stock_data_tables) {

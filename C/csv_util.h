@@ -1,14 +1,9 @@
 #ifndef CSV_UTIL_H
 #define CSV_UTIL_H
 
-#include <stddef.h>
 #include <sys/types.h>
 
-typedef struct {
-    u_int16_t year;
-    u_int8_t month;
-    u_int8_t day;
-} Date;
+#include "date_util.h"
 
 typedef struct {
     Date date;
@@ -23,6 +18,7 @@ typedef struct {
     char* stock_symbol;
     StockDataRow* rows;
     size_t row_count;
+    size_t capacity;
 } StockDataTable;
 
 void read_stock_csv(
@@ -30,6 +26,13 @@ void read_stock_csv(
     StockDataTable* table,
     const u_int16_t* start_year,
     const u_int16_t* end_year
+);
+
+void get_min_and_max_dates(
+    StockDataTable** stock_data_tables,
+    size_t table_count,
+    Date* min_date,
+    Date* max_date
 );
 
 #endif //CSV_UTIL_H

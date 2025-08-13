@@ -10,6 +10,8 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
+#include "config.h"
+#include "file_util.h"
 #include "internal_config.h"
 
 // File format:
@@ -126,6 +128,7 @@ void free_fixed_size_tree(FixedSizeTree* tree) {
 
 
 FixedSizeTree read_fixed_size_tree_file(const char* filename) {
+    assert(filename != nullptr);
     const int fd = open(filename, O_RDONLY);
     if (fd == -1) {
         perror("open failed");
@@ -146,7 +149,14 @@ FixedSizeTree read_fixed_size_tree_file(const char* filename) {
 
     const long int page_size = sysconf(_SC_PAGESIZE);
     const long int length = (st.st_size + page_size - 1) & ~(page_size - 1);
-    char* tree_map = mmap(NULL, (size_t)length, PROT_READ, MAP_SHARED, fd, 0);
+    char* tree_map = mmap(
+        NULL,
+        (size_t)length,
+        PROT_READ,
+        MAP_SHARED,
+        fd,
+        0
+    );
     if (tree_map == MAP_FAILED) {
         perror("mmap failed");
         close(fd);
@@ -156,14 +166,14 @@ FixedSizeTree read_fixed_size_tree_file(const char* filename) {
 
     const FixedSizeTree tree = {
         .start = tree_map,
-        .length = length
+        .length = (size_t)length
     };
 
     return tree;
 }
 
 typedef struct {
-    const TreeHashMap** nodes;
+    const SequenceCountingTrie** nodes;
     size_t* depths;
     size_t count;
     size_t capacity;
@@ -171,13 +181,13 @@ typedef struct {
 
 static void add_to_node_list(
     NodeList* list,
-    const TreeHashMap* node,
+    const SequenceCountingTrie* node,
     const size_t depth
 ) {
     if (list->count >= list->capacity) {
         list->capacity *= 2;
-        const TreeHashMap** tmp_nodes =
-            realloc(list->nodes, list->capacity * sizeof(TreeHashMap*));
+        const SequenceCountingTrie** tmp_nodes =
+            realloc(list->nodes, list->capacity * sizeof(SequenceCountingTrie*));
         if (!tmp_nodes) {
             perror("realloc failed");
             exit(EXIT_FAILURE);
@@ -198,7 +208,7 @@ static void add_to_node_list(
 }
 
 static void dfs(
-    const TreeHashMap* node,
+    const SequenceCountingTrie* node,
     const size_t depth,
     NodeList* list,
     size_t* number_of_nodes
@@ -206,8 +216,8 @@ static void dfs(
     add_to_node_list(list, node, depth);
     (*number_of_nodes)++;
 
-    for (size_t i = 0; i < node->size; ++i) {
-        const TreeHashMap* child = node->map[i];
+    for (size_t i = 0; i < node->capacity; ++i) {
+        const SequenceCountingTrie* child = node->map[i];
         if (child) {
             dfs(child, depth + 1, list, number_of_nodes);
         }
@@ -251,13 +261,13 @@ void ensure_buffer_capacity(
     }
 }
 
-void export_tree_to_file(const TreeHashMap* root, FILE* out) {
+void export_tree_to_file(const SequenceCountingTrie* root, FILE* out) {
     check_little_endian();
     if (!root || !out) return;
 
     // Convert the tree to a list of nodes
     NodeList node_list = {
-        .nodes = malloc(128 * sizeof(TreeHashMap*)),
+        .nodes = malloc(128 * sizeof(SequenceCountingTrie*)),
         .depths = malloc(128 * sizeof(size_t)),
         .count = 0,
         .capacity = 128
@@ -284,7 +294,7 @@ void export_tree_to_file(const TreeHashMap* root, FILE* out) {
     size_t current_offset = 0;
     for (size_t i = 0; i < node_list.count; ++i) {
         offsets[i] = current_offset;
-        const TreeHashMap* node = node_list.nodes[i];
+        const SequenceCountingTrie* node = node_list.nodes[i];
         const size_t depth = node_list.depths[i];
 
         ensure_buffer_capacity(
@@ -323,8 +333,8 @@ void export_tree_to_file(const TreeHashMap* root, FILE* out) {
 
 
         // Write child indices
-        for (size_t j = 0; j < node->size; ++j) {
-            const TreeHashMap* child = node->map[j];
+        for (size_t j = 0; j < node->capacity; ++j) {
+            const SequenceCountingTrie* child = node->map[j];
             if (child) {
                 for (size_t k = 0; k < node_list.count; ++k) {
                     if (node_list.nodes[k] == child) {
@@ -438,7 +448,7 @@ uint64_t get_number_of_nodes(const char* tree) {
             (child_index * (sizeof(long) + sizeof(size_t)));
         const char* child_address = key_address + sizeof(long);
         number_of_nodes +=
-            get_number_of_nodes(tree + (*(size_t*)child_address));
+            get_number_of_nodes(tree + (*(const size_t*)child_address));
     }
     return number_of_nodes;
 }
@@ -468,7 +478,7 @@ uint64_t get_max_node_size(char* tree) {
             (child_index * (sizeof(long) + sizeof(size_t)));
         const char* child_address = key_address + sizeof(long);
         const uint64_t child_number_of_bytes =
-            get_max_node_size(tree + (*(size_t*)child_address));
+            get_max_node_size(tree + (*(const size_t*)child_address));
         if (child_number_of_bytes > number_of_bytes) {
             number_of_bytes = child_number_of_bytes;
         }
@@ -477,18 +487,18 @@ uint64_t get_max_node_size(char* tree) {
 }
 
 void print_bounds_on_trees() {
-    for (size_t year = START_YEAR; year < END_YEAR; year++) {
+    for (uint16_t year = START_YEAR; year < END_YEAR; year++) {
         // tree must be freed
         // ---------------------------------------------------------------------
         FixedSizeTree tree = load_tree_from_year(year);
         printf(
-            "Number of nodes for %lu: %lu\n",
+            "Number of nodes for %hu: %lu\n",
             year,
             get_number_of_nodes(tree.start)
         );
 
         printf(
-            "Max node size for %lu: %lu\n",
+            "Max node size for %hu: %lu\n",
             year,
             get_max_node_size(tree.start)
         );

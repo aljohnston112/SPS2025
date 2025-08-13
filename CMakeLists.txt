@@ -117,8 +117,10 @@ set(
         CPP/csv_lion/StringSpanner.c
         C/csv_util.c
         C/file_util.c
-        C/tree.c
+        C/sequence_counting_trie.c
         C/ranks.c
+        C/rank_hash_map.c
+        C/date_util.c
         C/tree_file_util.c
 )
 
@@ -132,8 +134,10 @@ set(
         C/file_util.h
         C/internal_config.h
         C/config.h
-        C/tree.h
+        C/sequence_counting_trie.h
         C/ranks.h
+        C/rank_hash_map.h
+        C/date_util.h
         C/tree_file_util.h
 )
 
