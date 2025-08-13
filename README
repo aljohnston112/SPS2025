@@ -5,7 +5,7 @@ and they have provided valuable insights for this iteration of the project.
 The first being that performance is important,
 and most others being related to what kind of ideas do not work.
 Using direction data of price, volume, and date as a predictor has not worked.
-Trees using direction data history to predict where no better than random.
+Trees using direction data history to predict were no better than random.
 Creating every permutation of direction sets across all table attributes,
 and then assigning any two to be buy or sell signals also did not work well.
 Plain artificial neural networks and genetic algorithms to choose models
