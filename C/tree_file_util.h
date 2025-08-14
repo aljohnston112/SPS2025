@@ -8,7 +8,9 @@
 typedef struct {
     char* start;
     size_t length;
-} FixedSizeTree;
+} FixedSizeTrie;
+
+// Utility methods for acting on FixedSizeTree
 
 size_t get_depth(const char* node);
 
@@ -22,14 +24,16 @@ uint64_t get_number_of_children(const char* node);
 
 char* get_child_with_key(char* root, const char* node, long child_key);
 
-FixedSizeTree read_fixed_size_tree_file(const char* filename);
+// Other methods
 
-FixedSizeTree load_tree_from_year(uint16_t year);
+void export_tree_to_file(const SequenceCountingTrie* trie, FILE* output_file);
 
-void export_tree_to_file(const SequenceCountingTrie* root, FILE* out);
+FixedSizeTrie read_fixed_size_tree_file(const char* filename);
 
-void free_fixed_size_tree(FixedSizeTree* tree);
+FixedSizeTrie load_tree_from_year(uint16_t year);
 
-void print_bounds_on_trees();
+void print_bounds_on_tries();
+
+void free_fixed_size_tree(FixedSizeTrie* trie);
 
 #endif //TREE_FILE_UTIL_H

@@ -29,7 +29,7 @@ void read_tree_matches_written_tree(void) {
     FILE* f1 = fopen(test_file_name, "w+");
     assert(f1);
     export_tree_to_file(root, f1);
-    FixedSizeTree read_tree_struct =
+    FixedSizeTrie read_tree_struct =
         read_fixed_size_tree_file(test_file_name);
     char* read_tree = read_tree_struct.start;
 
