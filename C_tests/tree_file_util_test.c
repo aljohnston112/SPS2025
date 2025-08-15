@@ -26,36 +26,46 @@ void read_tree_matches_written_tree(void) {
     add_sequence_to_trie(root, sequence3, 3, went_up, window_size);
 
     const char* test_file_name = "tree_data/read_tree_matches_written_tree.test";
-    FILE* f1 = fopen(test_file_name, "w+");
+    FILE* f1 = fopen(test_file_name, "w");
     assert(f1);
-    export_tree_to_file(root, f1);
+    export_trie_to_file(root, f1);
     FixedSizeTrie read_tree_struct =
-        read_fixed_size_tree_file(test_file_name);
+        read_fixed_size_trie_from_file(test_file_name);
     char* read_tree = read_tree_struct.start;
 
-    char* node1 = get_child_with_key(read_tree, read_tree, 1);
+    const char* node1 = get_child_with_key(read_tree, read_tree, 1);
     assert(get_down_count(node1) == 1);
     assert(get_up_count(node1)  == 3);
+    assert(get_depth(node1) == 1);
+    assert(get_key(node1) == 1);
 
-    char* node = get_child_with_key(read_tree, node1, 2);
+    const char* node = get_child_with_key(read_tree, node1, 2);
     assert(get_down_count(node) == 2);
     assert(get_up_count(node) == 1);
+    assert(get_depth(node) == 2);
+    assert(get_key(node) == 2);
 
     assert(get_child_with_key(read_tree, node, 3) == NULL);
 
-    char* node3 = get_child_with_key(read_tree, read_tree, 3);
+    const char* node3 = get_child_with_key(read_tree, read_tree, 3);
     assert(get_down_count(node3) == 1);
     assert(get_up_count(node3) == 0);
+    assert(get_depth(node3) == 1);
+    assert(get_key(node3) == 3);
 
     node = get_child_with_key(read_tree, node3, 2);
     assert(get_down_count(node) == 0);
     assert(get_up_count(node) == 1);
+    assert(get_depth(node) == 2);
+    assert(get_key(node) == 2);
 
     assert(get_child_with_key(read_tree, node, 4) == nullptr);
 
     node = get_child_with_key(read_tree, node1, 4);
     assert(get_down_count(node) == 1);
     assert(get_up_count(node) == 0);
+    assert(get_depth(node) == 2);
+    assert(get_key(node) == 4);
 
     assert(get_child_with_key(read_tree, node, 3) == nullptr);
 

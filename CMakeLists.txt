@@ -118,6 +118,8 @@ set(
         C/csv_util.c
         C/file_util.c
         C/sequence_counting_trie.c
+        C/back_tester.c
+        C/stock_picker.c
         C/ranks.c
         C/rank_hash_map.c
         C/date_util.c
@@ -135,6 +137,8 @@ set(
         C/internal_config.h
         C/config.h
         C/sequence_counting_trie.h
+        C/back_tester.h
+        C/stock_picker.h
         C/ranks.h
         C/rank_hash_map.h
         C/date_util.h
@@ -192,7 +196,7 @@ set(
         C_tests/csv_util_test.h
         C_tests/test_data.h
         C_tests/ranks_test.h
-        C_tests/tree_test.h
+        C_tests/sequence_counting_trie_test.h
         C_tests/tree_file_util_test.h
 )
 
@@ -202,7 +206,7 @@ set(
         C_tests/file_util_test.c
         C_tests/csv_util_test.c
         C_tests/ranks_test.c
-        C_tests/tree_test.c
+        C_tests/sequence_counting_trie_test.c
         C_tests/tree_file_util_test.c
 )
 

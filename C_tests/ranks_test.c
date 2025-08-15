@@ -104,8 +104,8 @@ rank_stocks_by_low_with_different_sized_inputs_fills_rank_diffs_and_went_up_corr
     assert(ranks_for_b->went_up[3] == true);
     assert(ranks_for_b->went_up[4] == true);
 
-    assert(ranks_for_a->data_size == 8);
-    assert(ranks_for_b->data_size == 9);
+    assert(ranks_for_a->capacity == 8);
+    assert(ranks_for_b->capacity == 9);
 
     free_symbol_to_ranks_hash_map(map);
 }
@@ -217,8 +217,8 @@ create_rank_diffs_with_different_sized_inputs_fills_rank_diffs_and_went_up_corre
     assert(ranks_for_b->went_up[3] == true);
     assert(ranks_for_b->went_up[4] == true);
     
-    assert(ranks_for_a->data_size == 8);
-    assert(ranks_for_b->data_size == 9);
+    assert(ranks_for_a->capacity == 8);
+    assert(ranks_for_b->capacity == 9);
 
     free_symbol_to_ranks_hash_map(map);
 }
@@ -314,7 +314,7 @@ void rank_valid_stocks_by_low_handles_gaps() {
     // rank diffs
     assert(ranks_for_a->rank_diffs != NULL);
     assert(ranks_for_a->went_up != NULL);
-    assert(ranks_for_a->data_size == 5);
+    assert(ranks_for_a->capacity == 5);
     for (int i = 0; i < 5; i++) {
         assert(ranks_for_a->rank_diffs[i] == 0);
     }
@@ -322,7 +322,7 @@ void rank_valid_stocks_by_low_handles_gaps() {
     // went up
     assert(ranks_for_b->rank_diffs != NULL);
     assert(ranks_for_b->went_up != NULL);
-    assert(ranks_for_b->data_size == 4);
+    assert(ranks_for_b->capacity == 4);
     for (int i = 0; i < 4; i++) {
         assert(ranks_for_b->rank_diffs[i] == 0);
     }
@@ -334,29 +334,29 @@ void rank_valid_stocks_by_low_handles_gaps() {
 void next_day_increments_date_correctly() {
     // New month
     Date d1 = {2023, 1, 31};
-    next_day(&d1);
+    increment_date_by_one_day(&d1);
     assert(d1.year == 2023 && d1.month == 2 && d1.day == 1);
 
     // Leap year
     Date d2 = {2024, 2, 28};
-    next_day(&d2);
+    increment_date_by_one_day(&d2);
     assert(d2.year == 2024 && d2.month == 2 && d2.day == 29);
-    next_day(&d2);
+    increment_date_by_one_day(&d2);
     assert(d2.year == 2024 && d2.month == 3 && d2.day == 1);
 
     // Non leap year
     Date d3 = {1900, 2, 28};
-    next_day(&d3);
+    increment_date_by_one_day(&d3);
     assert(d3.year == 1900 && d3.month == 3 && d3.day == 1);
 
     // New year
     Date d4 = {1999, 12, 31};
-    next_day(&d4);
+    increment_date_by_one_day(&d4);
     assert(d4.year == 2000 && d4.month == 1 && d4.day == 1);
 
     // New day
     Date d5 = {2023, 6, 15};
-    next_day(&d5);
+    increment_date_by_one_day(&d5);
     assert(d5.year == 2023 && d5.month == 6 && d5.day == 16);
 }
 
@@ -674,7 +674,7 @@ void initialize_symbol_to_ranks_hash_map_correctly_initializes() {
     );
     assert(stock_ranks);
     assert(stock_ranks->current_index == 0);
-    assert(stock_ranks->data_size == LARGEST_STOCK_DATASET_SIZE * 2);
+    assert(stock_ranks->capacity == LARGEST_STOCK_DATASET_SIZE * 2);
     assert(stock_ranks->stock_symbol == stock_table->stock_symbol);
     assert(stock_ranks->rank_per_day != NULL);
     assert(stock_ranks->low_per_day != NULL);

@@ -11,6 +11,7 @@
 #include "config.h"
 #include "file_util.h"
 #include "internal_config.h"
+#include "ranks.h"
 
 // File format:
 //     A list of these:
@@ -137,6 +138,67 @@ char* get_child_with_key(char* root, const char* node, const long child_key) {
     return nullptr;
 }
 
+void get_prediction_helper(
+    const FixedSizeTrie* trie,
+    const long* past_sequence,
+    const size_t sequence_length,
+    double* prediction,
+    size_t* depth
+) {
+    assert(prediction != NULL);
+
+    const char* current_trie = trie->start;
+    for (size_t i = 0; i < sequence_length; i++) {
+        current_trie = get_child_with_key(
+            trie->start,
+            current_trie,
+            past_sequence[i]
+        );
+        if (current_trie == NULL) {
+            *prediction = 0.0;
+            return;
+        }
+        (*depth)++;
+    }
+
+    const uint64_t count_up = get_up_count(current_trie);
+    const uint64_t count_down = get_down_count(current_trie);
+    const uint64_t total_count = count_down + count_up;
+    if (count_up > count_down) {
+        *prediction = (double)count_up / (double)total_count;
+    } else {
+        *prediction = -((double)count_down / (double)total_count);
+    }
+}
+
+void get_prediction(
+    const FixedSizeTrie* trie,
+    const long* past_sequence,
+    const size_t sequence_length,
+    double* prediction,
+    size_t* depth
+) {
+    for (size_t i = sequence_length; i > 0; i--) {
+        size_t current_depth = 0;
+        double current_prediction = 0.0;
+        get_prediction_helper(
+            trie,
+            past_sequence + (sequence_length - i),
+            i,
+            &current_prediction,
+            &current_depth
+        );
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
+        if (current_prediction != 0.0) {
+#pragma GCC diagnostic pop
+            *prediction = current_prediction;
+            *depth = current_depth;
+            break;
+        }
+    }
+}
+
 /**
  *
  * @return true if the system is little endian, else false.
@@ -260,6 +322,133 @@ void get_node_list_of_trie(
 }
 
 /**
+ * Saves a trie for every year using the config in config.h
+ * for the settings of the tries.
+ */
+void save_yearly_tries() {
+    // past_stock_data_tables needs to be freed
+    // -------------------------------------------------------------------------
+    StockDataTables* past_stock_data_tables =
+        malloc(sizeof(StockDataTables));
+    if (past_stock_data_tables == NULL) {
+        fprintf(stderr, "malloc failed");
+        exit(EXIT_FAILURE);
+    }
+    memset(past_stock_data_tables, 0, sizeof(StockDataTables));
+    past_stock_data_tables->tables = nullptr;
+    past_stock_data_tables->table_count = 0;
+    past_stock_data_tables->table_count = 0;
+
+    // first year is 1965
+    u_int16_t start_year = 1965;
+    uint16_t end_year = start_year + 1;
+    while (start_year < 2025) {
+        start_year++;
+        end_year++;
+
+        char* filename;
+        asprintf(
+            &filename,
+            "%s/tree_%d_%d_%d_%d.tree",
+            TREE_DATA_FOLDER,
+            start_year,
+            DAYS_PER_DIFF,
+            BUY_SELL_LAG,
+            MAX_TRIE_DEPTH
+        );
+
+        if (access(filename, F_OK) == 0) {
+            // file exists
+            free(filename);
+            continue;
+        }
+
+        const bool success = load_stock_data_from_disk(
+            past_stock_data_tables,
+            &start_year,
+            &end_year,
+            INTERMEDIATE_DATA_FOLDER
+        );
+        if (!success) {
+            exit(EXIT_FAILURE);
+        }
+
+        // past_symbol_to_ranks_map must be freed
+        // ---------------------------------------------------------------------
+        SymbolToRanksHashMap* past_symbol_to_ranks_map =
+            malloc(sizeof(SymbolToRanksHashMap));
+        if (past_symbol_to_ranks_map == NULL) {
+            fprintf(stderr, "malloc failed");
+            exit(EXIT_FAILURE);
+        }
+        past_symbol_to_ranks_map->count = 0;
+
+        initialize_symbol_to_ranks_hash_map(
+            past_stock_data_tables,
+            past_symbol_to_ranks_map
+        );
+
+        rank_stocks_by_low(
+            past_stock_data_tables,
+            past_symbol_to_ranks_map,
+            DAYS_PER_DIFF,
+            BUY_SELL_LAG
+        );
+
+        // trie needs to be freed
+        // ---------------------------------------------------------------------
+        SequenceCountingTrie* trie = create_sequence_counting_trie(0);
+        assert(trie);
+        fill_trie(
+            past_symbol_to_ranks_map,
+            trie,
+            DAYS_PER_DIFF,
+            BUY_SELL_LAG,
+            MAX_TRIE_DEPTH
+        );
+
+        FILE* fd = fopen(filename, "w");
+        free(filename);
+        if (fd == NULL) {
+            perror("fopen failed");
+            exit(EXIT_FAILURE);
+        }
+        export_trie_to_file(trie, fd);
+        fclose(fd);
+
+        // tree freed
+        // ---------------------------------------------------------------------
+        free_trie(trie);
+
+        // past_symbol_to_ranks_map freed
+        // ---------------------------------------------------------------------
+        free_symbol_to_ranks_hash_map(past_symbol_to_ranks_map);
+
+        // past_stock_data_tables freed
+        // ---------------------------------------------------------------------
+        free_stock_data_tables(past_stock_data_tables);
+
+        // past_stock_data_tables needs to be freed
+        // ----------------------------------------------------------------------
+        past_stock_data_tables = malloc(sizeof(StockDataTables));
+        if (past_stock_data_tables == NULL) {
+            perror("malloc failed");
+            exit(EXIT_FAILURE);
+        }
+        memset(past_stock_data_tables, 0, sizeof(StockDataTables));
+        past_stock_data_tables->tables = nullptr;
+        past_stock_data_tables->table_count = 0;
+        past_stock_data_tables->capacity = 0;
+    }
+
+    // past_symbol_to_ranks_map freed
+    // -------------------------------------------------------------------------
+    if (past_stock_data_tables) {
+        free_stock_data_tables(past_stock_data_tables);
+    }
+}
+
+/**
  * Writes the given trie to file.
  * The file format of the trie is as follows:
  *    A list of these:
@@ -277,13 +466,13 @@ void get_node_list_of_trie(
  * @param trie The trie to write to file.
  * @param output_file The file to output the tree.
  */
-void export_tree_to_file(const SequenceCountingTrie* trie, FILE* output_file) {
+void export_trie_to_file(const SequenceCountingTrie* trie, FILE* output_file) {
     assert(trie);
     assert(output_file);
     check_little_endian();
 
     // Convert the tree to a list of nodes
-    static int start_size = 128;
+    static uint16_t start_size = 128;
     NodeList node_list = {
         .nodes = malloc(start_size * sizeof(SequenceCountingTrie*)),
         .depths = malloc(start_size * sizeof(size_t)),
@@ -421,7 +610,7 @@ void export_tree_to_file(const SequenceCountingTrie* trie, FILE* output_file) {
  * @param filename The file to load the trie from.
  * @return The trie loaded from the file.
  */
-FixedSizeTrie read_fixed_size_tree_file(const char* filename) {
+FixedSizeTrie read_fixed_size_trie_from_file(const char* filename) {
     assert(filename != nullptr);
     const int fd = open(filename, O_RDONLY);
     if (fd == -1) {
@@ -472,7 +661,7 @@ FixedSizeTrie read_fixed_size_tree_file(const char* filename) {
  * @param year The year of the trie to load.
  * @return The loaded trie.
  */
-FixedSizeTrie load_tree_from_year(const uint16_t year) {
+FixedSizeTrie load_trie_from_year(const uint16_t year) {
     // filePaths must be freed
     // -------------------------------------------------------------------------
     FilePathList file_data;
@@ -504,7 +693,7 @@ FixedSizeTrie load_tree_from_year(const uint16_t year) {
         }
     }
 
-    const FixedSizeTrie trie = read_fixed_size_tree_file(trie_file_path);
+    const FixedSizeTrie trie = read_fixed_size_trie_from_file(trie_file_path);
 
     // filePaths freed
     // -------------------------------------------------------------------------
@@ -569,7 +758,7 @@ void print_bounds_on_tries() {
     for (uint16_t year = START_YEAR; year < END_YEAR; year++) {
         // tree must be freed
         // ---------------------------------------------------------------------
-        FixedSizeTrie trie = load_tree_from_year(year);
+        FixedSizeTrie trie = load_trie_from_year(year);
         printf(
             "Number of nodes for %hu: %lu\n",
             year,

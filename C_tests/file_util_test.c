@@ -168,6 +168,7 @@ void load_raw_stock_data_loads_correct_data() {
             malloc(ROWS_IN_TEST_FILE * sizeof(StockDataRow));
         assert(current_table->rows);
         current_table->row_count = ROWS_IN_TEST_FILE;
+        current_table->capacity = ROWS_IN_TEST_FILE;
         if (current_table->rows == NULL) {
             perror("Failed to allocate stock data rows");
             exit(1);

@@ -32,6 +32,60 @@ SequenceCountingTrie* create_sequence_counting_trie(const long key) {
 }
 
 /**
+ * Adds rank_diff sequences and whether they lead to profit (went_up)
+ * (BUY_SELL_LAG + 1) days after the diff sequence.
+ * All stocks and subsequences will be added to the tree.
+ *
+ * @param symbol_to_ranks_map A map of stock symbols to rank data.
+ *                            The rank data must include rank_diffs
+ *                            and went_up data.
+ * @param trie The tree to feed the rank_diffs sequence data to.
+ * @param days_per_diff The number of days that were looked back on
+ *                      to create the rank diffs.
+ * @param buy_sell_lag The number of days that were looked ahead
+ *                     to determine if price went up
+ * @param trie_depth The maximum depth of the trie.
+ */
+void fill_trie(
+    const SymbolToRanksHashMap* symbol_to_ranks_map,
+    SequenceCountingTrie* trie,
+    const size_t days_per_diff,
+    const size_t buy_sell_lag,
+    const size_t trie_depth
+) {
+    // (the diff size) + (the day after_diff) + (the price lag)
+    const size_t required_data_size =
+        (days_per_diff + 1) + (1) + (buy_sell_lag);
+
+    for (size_t j = 0; j < RANK_MAP_SIZE; j++) {
+        const StockRanks* stock_ranks =
+            symbol_to_ranks_map->symbol_to_ranks[j];
+        if (stock_ranks) {
+            const size_t data_size = stock_ranks->capacity;
+            if (data_size >= required_data_size) {
+                // rank diffs before days_per_diff are invalid, so are skipped
+                // went_up is also invalid
+                // when there are not buy_sell_lag points in the future
+                for (size_t i = days_per_diff;
+                     i + buy_sell_lag < data_size;
+                     i++
+                ) {
+                    add_sequence_to_trie(
+                        trie,
+                        stock_ranks->rank_diffs + i,
+                        // 1 and buy_sell_lag are because no data is generated past that
+                        // 1 is for the gap day between when a diff is seen and the buy/sell
+                        data_size - i - 1 - buy_sell_lag,
+                        stock_ranks->went_up + i,
+                        trie_depth
+                    );
+                }
+            }
+        }
+    }
+}
+
+/**
  * Gets the child whose root contains the given key from the given tree.
  * If the child does not exist, it will be added as a child of the given tree.
  *

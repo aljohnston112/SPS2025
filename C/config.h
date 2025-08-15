@@ -1,6 +1,8 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include <stdint.h>
+
 // Debugging is easier when this is false
 #define IS_PARALLEL true
 
@@ -9,7 +11,7 @@
 #define LARGEST_STOCK_DATASET_SIZE 15844
 
 // max = 11356
-#define NUMBER_OF_STOCK_EXAMPLES 11356
+#define NUMBER_OF_STOCK_EXAMPLES 5000
 
 // must be a prime number greater than 2 * NUMBER_OF_STOCK_EXAMPLES
 #define RANK_MAP_SIZE 22717
@@ -21,7 +23,7 @@
 #define BUY_SELL_LAG 5
 
 // The depth of the prediction trees
-#define MAX_TREE_DEPTH 1
+#define MAX_TRIE_DEPTH 1
 
 // The first year that has any stock data
 #define START_YEAR 1965
@@ -30,5 +32,11 @@
 
 // How certain the tree should be before its predictions are acted on
 #define PREDICTION_THRESHOLD 0.5
+
+constexpr uint16_t past_end_year = 2023;
+constexpr uint16_t past_start_year = past_end_year - 1;
+
+constexpr uint16_t future_start_year = past_end_year;
+constexpr uint16_t future_end_year = future_start_year + 1;
 
 #endif //CONFIG_H

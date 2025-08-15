@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "rank_hash_map.h"
+
 #define MAX_INDEX 2048
 #define START_MAP_SIZE 61
 
@@ -22,6 +24,14 @@ struct SequenceCountTrie {
 };
 
 SequenceCountingTrie* create_sequence_counting_trie(long key);
+
+void fill_trie(
+    const SymbolToRanksHashMap* symbol_to_ranks_map,
+    SequenceCountingTrie* trie,
+    size_t days_per_diff,
+    size_t buy_sell_lag,
+    size_t trie_depth
+);
 
 SequenceCountingTrie* add_to_trie_or_get(SequenceCountingTrie* trie, long key);
 

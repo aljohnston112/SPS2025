@@ -32,6 +32,7 @@ void read_stock_csv(
     if (mapped_file_cursor_map_file(&file_cursor, filename) != 0) {
         fprintf(stderr, "Failed to load stock data from file: %s", filename);
         table->row_count = 0;
+        table->capacity = 0;
         return;
     }
 
@@ -117,11 +118,11 @@ void read_stock_csv(
         data_index++;
     }
 
-    if (data_index >= table->capacity) {
+    if (data_index > table->capacity) {
         fprintf(
             stderr,
             "Not enough space in the stock data tables; "
-            "need %lu more rows",
+            "need %lu more rows\n",
             data_index - table->capacity - 1
         );
     }

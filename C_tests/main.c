@@ -4,7 +4,7 @@
 #include "file_util_test.h"
 #include "ranks_test.h"
 #include "tree_file_util_test.h"
-#include "tree_test.h"
+#include "sequence_counting_trie_test.h"
 
 int main() {
     run_file_util_tests();

@@ -24,13 +24,23 @@ uint64_t get_number_of_children(const char* node);
 
 char* get_child_with_key(char* root, const char* node, long child_key);
 
+void get_prediction(
+    const FixedSizeTrie* trie,
+    const long* past_sequence,
+    size_t sequence_length,
+    double* prediction,
+    size_t* depth
+);
+
 // Other methods
 
-void export_tree_to_file(const SequenceCountingTrie* trie, FILE* output_file);
+void save_yearly_tries();
 
-FixedSizeTrie read_fixed_size_tree_file(const char* filename);
+void export_trie_to_file(const SequenceCountingTrie* trie, FILE* output_file);
 
-FixedSizeTrie load_tree_from_year(uint16_t year);
+FixedSizeTrie read_fixed_size_trie_from_file(const char* filename);
+
+FixedSizeTrie load_trie_from_year(uint16_t year);
 
 void print_bounds_on_tries();
 
