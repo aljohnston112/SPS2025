@@ -8,7 +8,7 @@
  * @param year The year to check.
  * @return true if given year is a leap year, else false.
  */
-bool is_leap_year(const uint16_t year) {
+__attribute__((const)) bool is_leap_year(const uint16_t year)  {
     return (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0);
 }
 
@@ -50,7 +50,7 @@ void increment_date_by_one_day(Date* date) {
  * @param date2 Second date
  * @return true if the first date is less than or equal to the last, else false.
  */
-bool is_date_less_or_equal(
+__attribute__((pure)) bool is_date_less_or_equal(
     const Date* date1,
     const Date* date2
 ) {
@@ -74,7 +74,7 @@ bool is_date_less_or_equal(
  * @param date2 Second date
  * @return true if the first date is less than the last, else false.
  */
-bool is_date_less(
+__attribute__((pure)) bool is_date_less(
     const Date* date1,
     const Date* date2
 ) {
@@ -98,12 +98,12 @@ bool is_date_less(
  * @return A negative number if a is less than b,
  *         a positive number if b is greater than a, else 0.
  */
-int compare_by_date(const void* a, const void* b) {
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-qual"
-    const StockDataRow* row_a = (*(StockDataTable**)a)->rows;
-    const StockDataRow* row_b = (*(StockDataTable**)b)->rows;
-#pragma GCC diagnostic pop
+__attribute__((pure)) int compare_by_date(const void* a, const void* b) {
+    const StockDataTable* const* stock_data_table_a = a;
+    const StockDataTable* const* stock_data_table_b = b;
+
+    const StockDataRow* row_a = (*stock_data_table_a)->rows;
+    const StockDataRow* row_b = (*stock_data_table_b)->rows;
 
     const uint16_t a_year = row_a->date.year;
     const uint16_t b_year = row_b->date.year;

@@ -19,8 +19,8 @@
 
 void load_stock_data_from_disk_loads_correct_data() {
     StockDataTables* tables = malloc(sizeof(StockDataTables));
-        tables->tables = nullptr;
-        tables->table_count = 0;
+    tables->tables = nullptr;
+    tables->table_count = 0;
     const bool success = load_stock_data_from_disk(
         tables,
         nullptr,
@@ -51,8 +51,8 @@ void load_stock_data_from_disk_loads_correct_data() {
 
 void load_stock_data_from_disk_with_start_date_loads_correct_data() {
     StockDataTables* tables = malloc(sizeof(StockDataTables));
-        tables->tables = nullptr;
-        tables->table_count = 0;
+    tables->tables = nullptr;
+    tables->table_count = 0;
     constexpr uint16_t start_year = 2001;
     const bool success = load_stock_data_from_disk(
         tables,
@@ -144,7 +144,7 @@ void load_stock_data_from_disk_with_start_and_end_date_loads_correct_data() {
 }
 
 void load_raw_stock_data_loads_correct_data() {
-    char* test_file_names[TEST_FILE_COUNT] = {
+    const char* test_file_names[TEST_FILE_COUNT] = {
         FAKE_DATA_FILE_NAME,
         FAKE_DATA_FILE_NAME2
     };
@@ -175,7 +175,14 @@ void load_raw_stock_data_loads_correct_data() {
         }
     }
 
-    load_stock_data_from_files(&file_list, tables, nullptr, nullptr);
+    if (!load_stock_data_from_files(
+            &file_list,
+            tables,
+            nullptr,
+            nullptr)
+    ) {
+        exit(EXIT_FAILURE);
+    }
     for (int i = 0; i < TEST_FILE_COUNT; i++) {
         const StockDataTable* table = &tables->tables[i];
         const bool is_first =
@@ -195,7 +202,7 @@ void load_raw_stock_data_loads_correct_data() {
 }
 
 void load_raw_stock_data_with_start_date_loads_correct_data() {
-    char* test_file_names[TEST_FILE_COUNT] = {
+    const char* test_file_names[TEST_FILE_COUNT] = {
         FAKE_DATA_FILE_NAME,
         FAKE_DATA_FILE_NAME2
     };
@@ -225,7 +232,15 @@ void load_raw_stock_data_with_start_date_loads_correct_data() {
     }
 
     constexpr uint16_t start_year = 2001;
-    load_stock_data_from_files(&file_list, tables, &start_year, nullptr);
+    if (!load_stock_data_from_files(
+            &file_list,
+            tables,
+            &start_year,
+            nullptr
+        )
+    ) {
+        exit(1);
+    }
     for (int i = 0; i < TEST_FILE_COUNT; i++) {
         const StockDataTable* table = &tables->tables[i];
         const bool is_first =
@@ -246,7 +261,7 @@ void load_raw_stock_data_with_start_date_loads_correct_data() {
 }
 
 void load_raw_stock_data_with_end_date_loads_correct_data() {
-    char* test_file_names[TEST_FILE_COUNT] = {
+    const char* test_file_names[TEST_FILE_COUNT] = {
         FAKE_DATA_FILE_NAME,
         FAKE_DATA_FILE_NAME2
     };
@@ -276,7 +291,14 @@ void load_raw_stock_data_with_end_date_loads_correct_data() {
     }
 
     constexpr uint16_t end_year = 2001;
-    load_stock_data_from_files(&file_list, tables, nullptr, &end_year);
+    if (!load_stock_data_from_files(
+            &file_list,
+            tables,
+            nullptr,
+            &end_year)
+    ) {
+        exit(1);
+    }
     assert(tables->table_count == 1);
     const StockDataTable* table = &tables->tables[0];
     assert(strcmp(table->stock_symbol, "fake_data") == 0);
@@ -287,7 +309,7 @@ void load_raw_stock_data_with_end_date_loads_correct_data() {
 }
 
 void load_raw_stock_data_with_start_and_end_date_loads_correct_data() {
-    char* test_file_names[TEST_FILE_COUNT] = {
+    const char* test_file_names[TEST_FILE_COUNT] = {
         FAKE_DATA_FILE_NAME,
         FAKE_DATA_FILE_NAME2
     };
@@ -316,7 +338,14 @@ void load_raw_stock_data_with_start_and_end_date_loads_correct_data() {
     }
     constexpr uint16_t start_year = 2001;
     constexpr uint16_t end_year = 2002;
-    load_stock_data_from_files(&file_list, tables, &start_year, &end_year);
+    if (!load_stock_data_from_files(
+            &file_list,
+            tables,
+            &start_year,
+            &end_year)
+    ) {
+        exit(1);
+    }
     for (int i = 0; i < TEST_FILE_COUNT; i++) {
         const StockDataTable* table = &tables->tables[i];
         const bool is_first =
@@ -352,8 +381,15 @@ void get_all_files_paths_recursive_on_empty_folder_returns_nothing() {
     create_folder(folder);
 
     FilePathList list;
-    get_all_files_paths_recursive(folder, &list);
-    assert(list.file_count == 0);
+    if (!get_all_files_paths_recursive(folder, &list)) {
+        rmdir(folder);
+        exit(EXIT_FAILURE);
+    }
+    if (list.file_count != 0) {
+        rmdir(folder);
+        free_all_files_paths(&list);
+        exit(EXIT_FAILURE);
+    }
     rmdir(folder);
     free_all_files_paths(&list);
 }
@@ -378,21 +414,48 @@ void get_all_files_paths_recursive_on_nested_folder_returns_both_files() {
     create_folder(nested_folder2_name);
 
     FilePathList list;
-    get_all_files_paths_recursive(base_folder_name, &list);
+    if (!get_all_files_paths_recursive(base_folder_name, &list)) {
+        exit(EXIT_FAILURE);
+    }
 
-    assert(list.file_count == 2);
-    assert(
+    if (list.file_count != 2) {
+        remove(filename1);
+        remove(filename2);
+        rmdir(nested_folder2_name);
+        rmdir(nested_folder_name);
+        rmdir(base_folder_name);
+        free_all_files_paths(&list);
+        exit(EXIT_FAILURE);
+    }
+    if (
         strcmp(
             list.file_paths[0],
             "./test_nested/nested_folder/file2.txt"
-        ) == 0
-    );
-    assert(
+        ) != 0
+    ) {
+        remove(filename1);
+        remove(filename2);
+        rmdir(nested_folder2_name);
+        rmdir(nested_folder_name);
+        rmdir(base_folder_name);
+        free_all_files_paths(&list);
+        exit(EXIT_FAILURE);
+    }
+    if (
         strcmp(
             list.file_paths[1],
             "./test_nested/file1.txt"
-        ) == 0
-    );
+        ) != 0
+    ) {
+        remove(filename1);
+        remove(filename2);
+        rmdir(nested_folder2_name);
+        rmdir(nested_folder_name);
+        rmdir(base_folder_name);
+        free_all_files_paths(&list);
+        exit(EXIT_FAILURE);
+    }
+
     remove(filename1);
     remove(filename2);
     rmdir(nested_folder2_name);

@@ -49,6 +49,7 @@ constexpr int child_entry_size = key_size + child_offset_size;
  * @param node A pointer to the start of a trie node.
  * @return The depth of the pointed to node.
  */
+__attribute__((pure))
 size_t get_depth(const char* node) {
     size_t val;
     memcpy(&val, node + depth_offset, depth_size);
@@ -59,6 +60,7 @@ size_t get_depth(const char* node) {
  * @param node A pointer to the start of a trie node.
  * @return The key of the pointed to node.
  */
+__attribute__((pure))
 long get_key(const char* node) {
     long val;
     memcpy(&val, node + key_offset, key_size);
@@ -69,6 +71,7 @@ long get_key(const char* node) {
  * @param node A pointer to the start of a trie node.
  * @return The up count of the pointed to node.
  */
+__attribute__((pure))
 uint64_t get_up_count(const char* node) {
     uint64_t val;
     memcpy(&val, node + up_count_offset, up_count_size);
@@ -79,6 +82,7 @@ uint64_t get_up_count(const char* node) {
  * @param node A pointer to the start of a trie node.
  * @return The down count of the pointed to node.
  */
+__attribute__((pure))
 uint64_t get_down_count(const char* node) {
     uint64_t val;
     memcpy(&val, node + down_count_offset, down_count_size);
@@ -89,6 +93,7 @@ uint64_t get_down_count(const char* node) {
  * @param node A pointer to the start of a trie node.
  * @return The number of children the pointed to node has.
  */
+__attribute__((pure))
 uint64_t get_number_of_children(const char* node) {
     uint64_t val;
     memcpy(
@@ -110,6 +115,7 @@ uint64_t get_number_of_children(const char* node) {
  * @return The start address of the child node of node with the given key, or
  *         null if node does not have a child with the given key.
  */
+__attribute__((pure))
 char* get_child_with_key(char* root, const char* node, const long child_key) {
     const uint64_t number_of_children = get_number_of_children(node);
     const char* start_offset = node + child_list_offset;
@@ -203,6 +209,7 @@ void get_prediction(
  *
  * @return true if the system is little endian, else false.
  */
+__attribute__((const))
 int is_little_endian() {
     uint16_t x = 1;
     return *((uint8_t*)&x) == 1;
@@ -325,14 +332,14 @@ void get_node_list_of_trie(
  * Saves a trie for every year using the config in config.h
  * for the settings of the tries.
  */
-void save_yearly_tries() {
+bool save_yearly_tries() {
     // past_stock_data_tables needs to be freed
     // -------------------------------------------------------------------------
     StockDataTables* past_stock_data_tables =
         malloc(sizeof(StockDataTables));
     if (past_stock_data_tables == NULL) {
         fprintf(stderr, "malloc failed");
-        exit(EXIT_FAILURE);
+        return false;
     }
     memset(past_stock_data_tables, 0, sizeof(StockDataTables));
     past_stock_data_tables->tables = nullptr;
@@ -363,14 +370,15 @@ void save_yearly_tries() {
             continue;
         }
 
-        const bool success = load_stock_data_from_disk(
-            past_stock_data_tables,
-            &start_year,
-            &end_year,
-            INTERMEDIATE_DATA_FOLDER
-        );
-        if (!success) {
-            exit(EXIT_FAILURE);
+        if (!load_stock_data_from_disk(
+                past_stock_data_tables,
+                &start_year,
+                &end_year,
+                INTERMEDIATE_DATA_FOLDER
+            )
+        ) {
+            free_stock_data_tables(past_stock_data_tables);
+            return false;
         }
 
         // past_symbol_to_ranks_map must be freed
@@ -378,27 +386,42 @@ void save_yearly_tries() {
         SymbolToRanksHashMap* past_symbol_to_ranks_map =
             malloc(sizeof(SymbolToRanksHashMap));
         if (past_symbol_to_ranks_map == NULL) {
+            free_stock_data_tables(past_stock_data_tables);
             fprintf(stderr, "malloc failed");
-            exit(EXIT_FAILURE);
+            return false;
         }
         past_symbol_to_ranks_map->count = 0;
 
-        initialize_symbol_to_ranks_hash_map(
-            past_stock_data_tables,
-            past_symbol_to_ranks_map
-        );
+        if (!initialize_symbol_to_ranks_hash_map(
+                past_stock_data_tables,
+                past_symbol_to_ranks_map
+            )
+        ) {
+            free_stock_data_tables(past_stock_data_tables);
+            free_symbol_to_ranks_hash_map(past_symbol_to_ranks_map);
+            return false;
+        }
 
-        rank_stocks_by_low(
-            past_stock_data_tables,
-            past_symbol_to_ranks_map,
-            DAYS_PER_DIFF,
-            BUY_SELL_LAG
-        );
+        if (!rank_stocks_by_low(
+                past_stock_data_tables,
+                past_symbol_to_ranks_map,
+                DAYS_PER_DIFF,
+                BUY_SELL_LAG
+            )
+        ) {
+            free_stock_data_tables(past_stock_data_tables);
+            free_symbol_to_ranks_hash_map(past_symbol_to_ranks_map);
+            return false;
+        }
 
         // trie needs to be freed
         // ---------------------------------------------------------------------
         SequenceCountingTrie* trie = create_sequence_counting_trie(0);
-        assert(trie);
+        if (!trie) {
+            free_stock_data_tables(past_stock_data_tables);
+            free_symbol_to_ranks_hash_map(past_symbol_to_ranks_map);
+            return false;
+        }
         fill_trie(
             past_symbol_to_ranks_map,
             trie,
@@ -411,12 +434,15 @@ void save_yearly_tries() {
         free(filename);
         if (fd == NULL) {
             perror("fopen failed");
-            exit(EXIT_FAILURE);
+            free_trie(trie);
+            free_stock_data_tables(past_stock_data_tables);
+            free_symbol_to_ranks_hash_map(past_symbol_to_ranks_map);
+            return false;
         }
         export_trie_to_file(trie, fd);
         fclose(fd);
 
-        // tree freed
+        // trie freed
         // ---------------------------------------------------------------------
         free_trie(trie);
 
@@ -432,8 +458,7 @@ void save_yearly_tries() {
         // ----------------------------------------------------------------------
         past_stock_data_tables = malloc(sizeof(StockDataTables));
         if (past_stock_data_tables == NULL) {
-            perror("malloc failed");
-            exit(EXIT_FAILURE);
+            return false;
         }
         memset(past_stock_data_tables, 0, sizeof(StockDataTables));
         past_stock_data_tables->tables = nullptr;
@@ -446,6 +471,7 @@ void save_yearly_tries() {
     if (past_stock_data_tables) {
         free_stock_data_tables(past_stock_data_tables);
     }
+    return true;
 }
 
 /**
@@ -665,8 +691,7 @@ FixedSizeTrie load_trie_from_year(const uint16_t year) {
     // filePaths must be freed
     // -------------------------------------------------------------------------
     FilePathList file_data;
-    get_all_files_paths_recursive(TREE_DATA_FOLDER, &file_data);
-    if (file_data.file_paths == NULL) {
+    if (!get_all_files_paths_recursive(TREE_DATA_FOLDER, &file_data)) {
         perror("Could not retrieve file paths.\n");
         exit(EXIT_FAILURE);
     }
@@ -675,7 +700,10 @@ FixedSizeTrie load_trie_from_year(const uint16_t year) {
     for (size_t i = 0; i < file_data.file_count; i++) {
         const char* file_path = file_data.file_paths[i];
         const char* lastSlashPosition = strrchr(file_path, '/');
-        assert(lastSlashPosition != NULL);
+        if(lastSlashPosition == NULL) {
+            free_all_files_paths(&file_data);
+            exit(EXIT_FAILURE);
+        }
         const char* file_name = lastSlashPosition + 1;
         char* end;
 
@@ -684,6 +712,7 @@ FixedSizeTrie load_trie_from_year(const uint16_t year) {
 
         const uint16_t trie_year = (uint16_t)strtol(file_name, &end, 10);
         if (end == file_name) {
+            free_all_files_paths(&file_data);
             perror("Failed to parse year");
             exit(EXIT_FAILURE);
         }
@@ -707,6 +736,7 @@ FixedSizeTrie load_trie_from_year(const uint16_t year) {
  * @param trie The trie whose nodes to count.
  * @return The number of nodes in the given trie.
  */
+__attribute__((pure))
 uint64_t get_number_of_nodes(const char* trie) {
     const uint64_t number_of_children = get_number_of_children(trie);
     uint64_t number_of_nodes = 1;
@@ -730,6 +760,7 @@ uint64_t get_number_of_nodes(const char* trie) {
  * @param trie The trie to find the max node size of.
  * @return The maximum node size of all the nodes in the given trie.
  */
+__attribute__((pure))
 uint64_t get_max_node_size(char* trie) {
     const uint64_t number_of_children = get_number_of_children(trie);
     uint64_t number_of_bytes =

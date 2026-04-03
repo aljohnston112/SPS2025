@@ -29,7 +29,7 @@ void plot_ranks(const std::span<StockRanks*> all_stock_ranks) {
     std::map<int, std::string> date_labels;
     for (const auto& stock_rank : all_stock_ranks) {
         if (stock_rank != nullptr) {
-            for (size_t i = 0; i < stock_rank->capacity; ++i) {
+            for (size_t i = 0; i < stock_rank->size; ++i) {
                 const Date* d = stock_rank->dates[i];
                 int date_int = d->year * 10000 + d->month * 100 + d->day;
                 unique_dates.insert(date_int);
@@ -48,11 +48,11 @@ void plot_ranks(const std::span<StockRanks*> all_stock_ranks) {
 
     // Plot each stock, align ranks to the all_dates axis, put NAN if missing
     for (const auto& stock_rank : all_stock_ranks) {
-        if (stock_rank == nullptr || stock_rank->capacity == 0) continue;
+        if (stock_rank == nullptr || stock_rank->size == 0) continue;
 
         // Map date -> rank for this stock
         std::map<int, double> rank_map;
-        for (size_t i = 0; i < stock_rank->capacity; ++i) {
+        for (size_t i = 0; i < stock_rank->size; ++i) {
             const Date* d = stock_rank->dates[i];
             int date_int = d->year * 10000 + d->month * 100 + d->day;
             rank_map[date_int] = static_cast<double>(stock_rank->rank_per_day[

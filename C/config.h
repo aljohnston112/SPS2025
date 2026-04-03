@@ -11,10 +11,15 @@
 #define LARGEST_STOCK_DATASET_SIZE 15844
 
 // max = 11356
-#define NUMBER_OF_STOCK_EXAMPLES 5000
-
-// must be a prime number greater than 2 * NUMBER_OF_STOCK_EXAMPLES
+#define NUMBER_OF_STOCK_EXAMPLES 11356
 #define RANK_MAP_SIZE 22717
+static_assert(
+    RANK_MAP_SIZE > (2 * NUMBER_OF_STOCK_EXAMPLES),
+    "Load factor too high! Quadratic probing requires RANK_MAP_SIZE must be "
+    "a prime number greater than 2 * NUMBER_OF_STOCK_EXAMPLES"
+);
+
+#define NUMBER_OF_COLUMNS_IN_CSV 10
 
 // How many days back to use for diffs
 #define DAYS_PER_DIFF 1
@@ -23,7 +28,7 @@
 #define BUY_SELL_LAG 5
 
 // The depth of the prediction trees
-#define MAX_TRIE_DEPTH 1
+#define MAX_TRIE_DEPTH 100
 
 // The first year that has any stock data
 #define START_YEAR 1965

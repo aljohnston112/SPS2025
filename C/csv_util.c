@@ -7,12 +7,55 @@
 #include "../CPP/csv_lion/CsvReader.h"
 #include "../CPP/csv_lion/MappedFileCursor.h"
 
+typedef struct {
+    const CsvCell* date;
+    const CsvCell* open;
+    const CsvCell* high;
+    const CsvCell* low;
+    const CsvCell* close;
+    const CsvCell* volume;
+} StockTableCsvHeaderCells;
+
+static inline bool parse_row(
+    const StockTableCsvHeaderCells header_cells,
+    StockDataRow* current_row,
+    const u_int16_t year
+) {
+    const char* date = header_cells.date->ptr;
+    const uint8_t current_month = (uint8_t)((date[4] - '0') * 10 + (date[5] - '0'));
+    const uint8_t current_day = (uint8_t)((date[6] - '0') * 10 + (date[7] - '0'));
+    current_row->date = (Date){
+        .year = year,
+        .month = current_month,
+        .day = current_day
+    };
+
+    // Load the first row
+    if (csv_cell_as_double(header_cells.open, &current_row->open) != 0) {
+        return false;
+    }
+    if (csv_cell_as_double(header_cells.high, &current_row->high) != 0) {
+        return false;
+    }
+    if (csv_cell_as_double(header_cells.low, &current_row->low) != 0) {
+        return false;
+    }
+    if (csv_cell_as_double(header_cells.close, &current_row->close) != 0) {
+        return false;
+    }
+    if (csv_cell_as_double(header_cells.volume, &current_row->volume) != 0) {
+        return false;
+    }
+    return true;
+}
+
 /**
  * Reads stock data from disk.
  *
  * @param filename The name of the stock data csv file.
  * @param table The table to be filled with the stock data from the file.
- *              The table must be allocated by the caller before calling this method.
+ *              The rows of the table must be allocated by the caller
+ *              before calling this method.
  *              It is up to the caller to ensure the table is large enough
  *              to hold the stock data.
 * @param start_year The first year, inclusive,
@@ -22,7 +65,7 @@
  *                 of the stock data to be loaded.
  *                 If null, stock data will be loaded to the end.
  */
-void read_stock_csv(
+bool read_stock_csv(
     const char* filename,
     StockDataTable* table,
     const u_int16_t* start_year,
@@ -30,104 +73,108 @@ void read_stock_csv(
 ) {
     MappedFileCursor file_cursor;
     if (mapped_file_cursor_map_file(&file_cursor, filename) != 0) {
-        fprintf(stderr, "Failed to load stock data from file: %s", filename);
-        table->row_count = 0;
-        table->capacity = 0;
-        return;
+        if (mapped_file_cursor_map_file(&file_cursor, filename) == -1) {
+            table->row_count = 0;
+            table->capacity = 0;
+            goto error;
+        }
+        mapped_file_cursor_clean_up(&file_cursor);
+        return true;
     }
 
     CsvReader reader;
     csv_reader_init(&reader, &file_cursor, ',');
-    csv_reader_read_row(&reader);
 
-    const CsvCursor* row = csv_reader_row(&reader);
-    const CsvCell* dateCell = csv_cursor_with_column_name(row, "<DATE>");
-    const CsvCell* openCell = csv_cursor_with_column_name(row, "<OPEN>");
-    const CsvCell* highCell = csv_cursor_with_column_name(row, "<HIGH>");
-    const CsvCell* lowCell = csv_cursor_with_column_name(row, "<LOW>");
-    const CsvCell* closeCell = csv_cursor_with_column_name(row, "<CLOSE>");
-    const CsvCell* volumeCell = csv_cursor_with_column_name(row, "<VOL>");
-
-    // Find the first row with the given start year
-    // or the first data point if it is greater than the start year
-    size_t data_index = 0;
-    if (start_year != NULL) {
-        while (csv_reader_read_row(&reader)) {
-            const char* date = dateCell->ptr;
-            u_int16_t year;
-            extract_uint16_t(date, date + 4, &year);
-
-            if (end_year != NULL && year > *end_year) {
-                data_index--;
-                break;
-            }
-            if (year >= *start_year) {
-                StockDataRow* current_row = &table->rows[0];
-
-                // Extract the date
-                u_int8_t current_month;
-                extract_uint8_t(date + 4, date + 6, &current_month);
-                u_int8_t current_day;
-                extract_uint8_t(date + 6, date + 8, &current_day);
-                current_row->date = (Date){
-                    .year = year,
-                    .month = current_month,
-                    .day = current_day
-                };
-
-                // Load the first row
-                csv_cell_as_double(openCell, &current_row->open);
-                csv_cell_as_double(highCell, &current_row->high);
-                csv_cell_as_double(lowCell, &current_row->low);
-                csv_cell_as_double(closeCell, &current_row->close);
-                csv_cell_as_double(volumeCell, &current_row->volume);
-                break;
-            }
-        }
-        data_index++;
+    // Parse header
+    if (csv_reader_read_row(&reader) == -1) {
+        goto error;
     }
+    const CsvCursor* row_cursor = &reader.cursor;
+    const CsvCell* dateCell =
+        get_cell_with_column_name(row_cursor, "<DATE>");
+    if (dateCell == nullptr) {
+        goto error;
+    }
+    const CsvCell* openCell =
+        get_cell_with_column_name(row_cursor, "<OPEN>");
+    if (openCell == nullptr) {
+        goto error;
+    }
+    const CsvCell* highCell =
+        get_cell_with_column_name(row_cursor, "<HIGH>");
+    if (highCell == nullptr) {
+        goto error;
+    }
+    const CsvCell* lowCell =
+        get_cell_with_column_name(row_cursor, "<LOW>");
+    if (lowCell == nullptr) {
+        goto error;
+    }
+    const CsvCell* closeCell =
+        get_cell_with_column_name(row_cursor, "<CLOSE>");
+    if (closeCell == nullptr) {
+        goto error;
+    }
+    const CsvCell* volumeCell =
+        get_cell_with_column_name(row_cursor, "<VOL>");
+    if (volumeCell == nullptr) {
+        goto error;
+    }
+    auto const header_cells = (StockTableCsvHeaderCells){
+        .date = dateCell,
+        .open = openCell,
+        .high = highCell,
+        .low = lowCell,
+        .close = closeCell,
+        .volume = volumeCell
+    };
 
-    // Load the data up to right before the end year
-    while (csv_reader_read_row(&reader)) {
+    // Parse data
+    size_t data_index = 0;
+    int result = 1;
+    while ((result = csv_reader_read_row(&reader)) == 1) {
+        if (data_index >= table->capacity) {
+            fprintf(
+                stderr,
+                "Not enough space in the stock data tables; "
+                "need %lu more rows\n",
+                data_index - table->capacity - 1
+            );
+            goto error;
+        }
+
         const char* date = dateCell->ptr;
-
         StockDataRow* current_row = &table->rows[data_index];
-        u_int16_t year;
-        extract_uint16_t(date, date + 4, &year);
+        const uint16_t year = (uint16_t)((date[0] - '0') * 1000 +
+            (date[1] - '0') * 100 +
+            (date[2] - '0') * 10 +
+            (date[3] - '0'));
+
+        if (start_year != NULL && year < *start_year) {
+            continue;
+        }
 
         if (end_year != NULL && year >= *end_year) {
             break;
         }
 
-        // Extract the date
-        u_int8_t current_month;
-        extract_uint8_t(date + 4, date + 6, &current_month);
-        u_int8_t current_day;
-        extract_uint8_t(date + 6, date + 8, &current_day);
-        current_row->date = (Date){
-            .year = year,
-            .month = current_month,
-            .day = current_day
-        };
+        if (!parse_row(header_cells, current_row, year)) {
+            goto error;
+        }
 
-        csv_cell_as_double(openCell, &current_row->open);
-        csv_cell_as_double(highCell, &current_row->high);
-        csv_cell_as_double(lowCell, &current_row->low);
-        csv_cell_as_double(closeCell, &current_row->close);
-        csv_cell_as_double(volumeCell, &current_row->volume);
         data_index++;
     }
-
-    if (data_index > table->capacity) {
-        fprintf(
-            stderr,
-            "Not enough space in the stock data tables; "
-            "need %lu more rows\n",
-            data_index - table->capacity - 1
-        );
+    if (result == -1) {
+        goto error;
     }
+
     mapped_file_cursor_clean_up(&file_cursor);
     table->row_count = data_index;
+
+    return true;
+error:
+    mapped_file_cursor_clean_up(&file_cursor);
+    return false;
 }
 
 /**

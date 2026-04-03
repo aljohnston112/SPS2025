@@ -22,7 +22,7 @@ void read_stock_csv_loads_correct_data() {
     );
     check_table(&table, expected_rows_for_fake_data, 6);
     free(table.rows);
-    free(table.stock_symbol);
+    free((void*)(uintptr_t)table.stock_symbol);
 }
 
 void read_stock_csv_with_start_date_loads_correct_data() {
@@ -36,7 +36,7 @@ void read_stock_csv_with_start_date_loads_correct_data() {
     read_stock_csv(FAKE_DATA_FILE_NAME, &table, &start, nullptr);
     check_table(&table, &expected_rows_for_fake_data[2], 4);
     free(table.rows);
-    free(table.stock_symbol);
+    free((void*)(uintptr_t)table.stock_symbol);
 }
 
 void read_stock_csv_with_end_date_loads_correct_data() {
@@ -50,7 +50,7 @@ void read_stock_csv_with_end_date_loads_correct_data() {
     read_stock_csv(FAKE_DATA_FILE_NAME, &table, nullptr, &end);
     check_table(&table, expected_rows_for_fake_data, 4);
     free(table.rows);
-    free(table.stock_symbol);
+    free((void*)(uintptr_t)table.stock_symbol);
 }
 
 
@@ -66,7 +66,7 @@ void read_stock_csv_with_start_and_end_date_loads_correct_data() {
     read_stock_csv(FAKE_DATA_FILE_NAME, &table, &start, &end);
     check_table(&table, &expected_rows_for_fake_data[2], 2);
     free(table.rows);
-    free(table.stock_symbol);
+    free((void*)(uintptr_t)table.stock_symbol);
 }
 
 void run_csv_util_tests() {

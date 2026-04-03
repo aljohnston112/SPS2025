@@ -15,13 +15,13 @@ typedef struct {
 } StockDataRow;
 
 typedef struct {
-    char* stock_symbol;
+    const char* stock_symbol;
     StockDataRow* rows;
     size_t row_count;
     size_t capacity;
 } StockDataTable;
 
-void read_stock_csv(
+bool read_stock_csv(
     const char* filename,
     StockDataTable* table,
     const u_int16_t* start_year,

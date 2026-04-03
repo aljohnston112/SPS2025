@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <sys/time.h>
 
 #include "back_tester.h"
@@ -16,13 +17,13 @@ void printOpenMPVersion() {
 }
 #endif
 
-void process(void) {
-    // process_and_print_promising_stocks();
-    prepare_data_and_run_back_test();
-    // save_yearly_trees();
+bool process(void) {
+    return prepare_data_and_run_back_test();
+    // return process_and_print_promising_stocks();
     // print_bounds_on_tries();
     // FixedSizeTrie map = load_trie_from_year(1965);
-    // run_fast_backtest();
+    // return run_fast_backtest();
+    return true;
 }
 
 int main() {
@@ -33,7 +34,9 @@ int main() {
     struct timeval start, stop;
     gettimeofday(&start, NULL);
 
-    process();
+    if (!process()) {
+        return EXIT_FAILURE;
+    }
 
     gettimeofday(&stop, NULL);
     const double time_taken =

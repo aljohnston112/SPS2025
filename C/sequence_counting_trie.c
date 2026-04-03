@@ -16,12 +16,13 @@ SequenceCountingTrie* create_sequence_counting_trie(const long key) {
     SequenceCountingTrie* trie = malloc(sizeof(SequenceCountingTrie));
     if (trie == NULL) {
         fprintf(stderr, "malloc failed");
-        exit(EXIT_FAILURE);
+        return nullptr;
     }
     trie->map = calloc(START_MAP_SIZE, sizeof(SequenceCountingTrie*));
     if (trie->map == NULL) {
+        free(trie);
         fprintf(stderr, "malloc failed");
-        exit(EXIT_FAILURE);
+        return nullptr;
     }
     trie->capacity = START_MAP_SIZE;
     trie->current_size = 0;
@@ -61,7 +62,7 @@ void fill_trie(
         const StockRanks* stock_ranks =
             symbol_to_ranks_map->symbol_to_ranks[j];
         if (stock_ranks) {
-            const size_t data_size = stock_ranks->capacity;
+            const size_t data_size = stock_ranks->size;
             if (data_size >= required_data_size) {
                 // rank diffs before days_per_diff are invalid, so are skipped
                 // went_up is also invalid
@@ -93,8 +94,10 @@ void fill_trie(
  * @param key The key of the child to search for.
  * @return The child with the given key.
  */
-SequenceCountingTrie* add_to_trie_or_get(SequenceCountingTrie* trie,
-                                         const long key) {
+__attribute__((returns_nonnull)) SequenceCountingTrie* add_to_trie_or_get(
+    SequenceCountingTrie* trie,
+    const long key
+) {
     uint64_t map_size = trie->capacity;
     if (__glibc_unlikely(trie->current_size * 2 >= map_size)) {
         // printf("Resize #: %ld\n", ++resizes);
@@ -208,7 +211,7 @@ void add_sequence_to_trie(
  * @param key The key of the child trie.
  * @return The child trie with the given key, or null if it does not exist.
  */
-SequenceCountingTrie* get_from_trie(
+__attribute__((pure)) SequenceCountingTrie* get_from_trie(
     const SequenceCountingTrie* trie,
     const long key
 ) {
@@ -437,7 +440,7 @@ void free_trie(SequenceCountingTrie* trie) {
  * @param value The value to check the primeness of.
  * @return True if the value is prime, else false.
  */
-bool is_prime(const size_t value) {
+__attribute__((const)) bool is_prime(const size_t value) {
     assert(value > 0);
     size_t i = 0;
     while (primes[i] != 0 && value > primes[i]) {

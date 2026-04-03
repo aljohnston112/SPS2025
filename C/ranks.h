@@ -10,13 +10,13 @@ typedef struct {
 
 int compare_by_low(const void* a, const void* b);
 
-void rank_valid_stocks_by_low(
+bool rank_valid_stocks_by_low(
     const SymbolToRanksHashMap* all_stock_ranks,
     StockDataTable** valid_stock_tables,
     size_t valid_stock_count
 );
 
-void rank_stocks_by_low(
+bool rank_stocks_by_low(
     const StockDataTables* stock_data_tables,
     const SymbolToRanksHashMap* all_stock_ranks,
     size_t days_per_diff,

@@ -3,6 +3,9 @@
 #include <assert.h>
 
 #include "../C/ranks.h"
+
+#include <stdio.h>
+
 #include "../C/config.h"
 
 #include <stdlib.h>
@@ -11,7 +14,10 @@
 void
 rank_stocks_by_low_with_different_sized_inputs_fills_rank_diffs_and_went_up_correctly() {
     SymbolToRanksHashMap* map = malloc(sizeof(SymbolToRanksHashMap));
-    assert(map != NULL);
+    if (map == NULL) {
+        perror("Failed to allocate map");
+        exit(EXIT_FAILURE);
+    }
     map->count = 0;
 
     // Stock a
@@ -24,7 +30,7 @@ rank_stocks_by_low_with_different_sized_inputs_fills_rank_diffs_and_went_up_corr
         {{2023, 1, 8}, 14, 22, 21, 14, 100},
         {{2023, 1, 9}, 9, 23, 22, 9, 100}
     };
-    const StockDataTable table_for_a = {"a", rows_for_a, 7};
+    const StockDataTable table_for_a = {"a", rows_for_a, 7, 7};
 
     // Stock c
     StockDataRow rows_for_b[] = {
@@ -38,14 +44,20 @@ rank_stocks_by_low_with_different_sized_inputs_fills_rank_diffs_and_went_up_corr
         {{2023, 1, 8}, 9, 21, 20, 9, 100}
     };
 
-    const StockDataTable table_for_b = {"b", rows_for_b, 8};
+    const StockDataTable table_for_b = {"b", rows_for_b, 8, 8};
 
     const StockDataTables stock_tables = {
         .tables = (StockDataTable[]){table_for_a, table_for_b},
         .table_count = 2
     };
-    initialize_symbol_to_ranks_hash_map(&stock_tables, map);
-    rank_stocks_by_low(&stock_tables, map, 2, 3);
+    if (!initialize_symbol_to_ranks_hash_map(&stock_tables, map)) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (!rank_stocks_by_low(&stock_tables, map, 2, 3)) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
     const StockRanks* ranks_for_a =
         get_from_ranks_hash_map(map, table_for_a.stock_symbol);
@@ -53,59 +65,125 @@ rank_stocks_by_low_with_different_sized_inputs_fills_rank_diffs_and_went_up_corr
         get_from_ranks_hash_map(map, table_for_b.stock_symbol);
 
     // first two rows did not have previous data for the diff
-    for (size_t i = 0; i < 2 ; i++) {
-        assert(ranks_for_a->rank_diffs[i] == 0);
+    for (size_t i = 0; i < 2; i++) {
+        if (ranks_for_a->rank_diffs[i] != 0) {
+            free_symbol_to_ranks_hash_map(map);
+            exit(EXIT_FAILURE);
+        }
     }
-    for (size_t i = 0; i < 2 ; i++) {
-        assert(ranks_for_b->rank_diffs[i] == 0);
+    for (size_t i = 0; i < 2; i++) {
+        if (ranks_for_b->rank_diffs[i] != 0) {
+            free_symbol_to_ranks_hash_map(map);
+            exit(EXIT_FAILURE);
+        }
     }
     // last three rows did not have enough the price lookahead
-    for (size_t i = 5; i < 8 ; i++) {
-        assert(ranks_for_a->rank_diffs[i] == 0);
+    for (size_t i = 5; i < 8; i++) {
+        if (ranks_for_a->rank_diffs[i] != 0) {
+            free_symbol_to_ranks_hash_map(map);
+            exit(EXIT_FAILURE);
+        }
     }
-    for (size_t i = 6; i < 9 ; i++) {
-        assert(ranks_for_b->rank_diffs[i] == 0);
+    for (size_t i = 6; i < 9; i++) {
+        if (ranks_for_b->rank_diffs[i] != 0) {
+            free_symbol_to_ranks_hash_map(map);
+            exit(EXIT_FAILURE);
+        }
     }
 
     // ranks are    1, 1, 0, 1, 0, 1, 1, 1
     //           0, 0, 0, 1, 0, 1, 0, 0, 0
     // diffs are    0, 0, -1, 0, 0, 0, 1, 0
     //           0, 0, 0, 1, 0, 0, 0, -1, 0
-    assert(ranks_for_a->rank_diffs[2] == -1);
-    assert(ranks_for_a->rank_diffs[3] == 0);
-    assert(ranks_for_a->rank_diffs[4] == 0);
+    if (ranks_for_a->rank_diffs[2] != -1) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->rank_diffs[3] != 0) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->rank_diffs[4] != 0) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
-    assert(ranks_for_b->rank_diffs[2] == 0);
-    assert(ranks_for_b->rank_diffs[3] == 1);
-    assert(ranks_for_b->rank_diffs[4] == 0);
-    assert(ranks_for_b->rank_diffs[5] == 0);
+    if (ranks_for_b->rank_diffs[2] != 0) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->rank_diffs[3] != 1) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->rank_diffs[4] != 0) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->rank_diffs[5] != 0) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
     // first three rows did not have previous data for the diff
-    for (size_t i = 0; i < 2 ; i++) {
-        assert(ranks_for_a->went_up[i] == 0);
+    for (size_t i = 0; i < 2; i++) {
+        if (ranks_for_a->went_up[i] != 0) {
+            free_symbol_to_ranks_hash_map(map);
+            exit(EXIT_FAILURE);
+        }
     }
-    for (size_t i = 0; i < 2 ; i++) {
-        assert(ranks_for_b->went_up[i] == 0);
+    for (size_t i = 0; i < 2; i++) {
+        if (ranks_for_b->went_up[i] != 0) {
+            free_symbol_to_ranks_hash_map(map);
+            exit(EXIT_FAILURE);
+        }
     }
     // last three rows did not have enough the price lookahead
-    for (size_t i = 4; i < 8 ; i++) {
-        assert(ranks_for_a->went_up[i] == 0);
+    for (size_t i = 4; i < 8; i++) {
+        if (ranks_for_a->went_up[i] != 0) {
+            free_symbol_to_ranks_hash_map(map);
+            exit(EXIT_FAILURE);
+        }
     }
-    for (size_t i = 5; i < 9 ; i++) {
-        assert(ranks_for_b->went_up[i] == 0);
+    for (size_t i = 5; i < 9; i++) {
+        if (ranks_for_b->went_up[i] != 0) {
+            free_symbol_to_ranks_hash_map(map);
+            exit(EXIT_FAILURE);
+        }
     }
 
     // went_up is    f, t
     //            t, f, t
-    assert(ranks_for_a->went_up[2] == false);
-    assert(ranks_for_a->went_up[3] == true);
+    if (ranks_for_a->went_up[2] != false) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->went_up[3] != true) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
-    assert(ranks_for_b->went_up[2] == false);
-    assert(ranks_for_b->went_up[3] == true);
-    assert(ranks_for_b->went_up[4] == true);
+    if (ranks_for_b->went_up[2] != false) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->went_up[3] != true) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->went_up[4] != true) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
-    assert(ranks_for_a->capacity == 8);
-    assert(ranks_for_b->capacity == 9);
+    if (ranks_for_a->size != 8) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->size != 9) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
     free_symbol_to_ranks_hash_map(map);
 }
@@ -114,7 +192,10 @@ rank_stocks_by_low_with_different_sized_inputs_fills_rank_diffs_and_went_up_corr
 void
 create_rank_diffs_with_different_sized_inputs_fills_rank_diffs_and_went_up_correctly() {
     SymbolToRanksHashMap* map = malloc(sizeof(SymbolToRanksHashMap));
-    assert(map != NULL);
+    if (map == NULL) {
+        perror("Failed to allocate map");
+        exit(EXIT_FAILURE);
+    }
     map->count = 0;
 
     // Stock a
@@ -127,7 +208,7 @@ create_rank_diffs_with_different_sized_inputs_fills_rank_diffs_and_went_up_corre
         {{2023, 1, 8}, 14, 22, 21, 14, 100},
         {{2023, 1, 9}, 9, 23, 22, 9, 100}
     };
-    const StockDataTable table_for_a = {"a", rows_for_a, 7};
+    const StockDataTable table_for_a = {"a", rows_for_a, 7, 7};
 
     // Stock b
     StockDataRow rows_for_b[] = {
@@ -141,19 +222,25 @@ create_rank_diffs_with_different_sized_inputs_fills_rank_diffs_and_went_up_corre
         {{2023, 1, 8}, 9, 21, 20, 9, 100}
     };
 
-    const StockDataTable table_for_b = {"b", rows_for_b, 8};
+    const StockDataTable table_for_b = {"b", rows_for_b, 8, 8};
 
     const StockDataTables stock_tables = {
         .tables = (StockDataTable[]){table_for_a, table_for_b},
         .table_count = 2
     };
-    initialize_symbol_to_ranks_hash_map(&stock_tables, map);
+    if (!initialize_symbol_to_ranks_hash_map(&stock_tables, map)) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
     StockDataTable* valid_tables[2] = {
         &stock_tables.tables[0],
         &stock_tables.tables[1]
     };
-    rank_valid_stocks_by_low(map, valid_tables, 2);
+    if (!rank_valid_stocks_by_low(map, valid_tables, 2)) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
     create_rank_diffs(
         map,
@@ -166,66 +253,135 @@ create_rank_diffs_with_different_sized_inputs_fills_rank_diffs_and_went_up_corre
         get_from_ranks_hash_map(map, table_for_b.stock_symbol);
 
     // first two rows did not have previous data for the diff
-    for (size_t i = 0; i < 2 ; i++) {
-        assert(ranks_for_a->rank_diffs[i] == 0);
+    for (size_t i = 0; i < 2; i++) {
+        if (ranks_for_a->rank_diffs[i] != 0) {
+            free_symbol_to_ranks_hash_map(map);
+            exit(EXIT_FAILURE);
+        }
     }
-    for (size_t i = 0; i < 2 ; i++) {
-        assert(ranks_for_b->rank_diffs[i] == 0);
+    for (size_t i = 0; i < 2; i++) {
+        if (ranks_for_b->rank_diffs[i] != 0) {
+            free_symbol_to_ranks_hash_map(map);
+            exit(EXIT_FAILURE);
+        }
     }
     // last three rows did not have enough the price lookahead
-    for (size_t i = 5; i < 8 ; i++) {
-        assert(ranks_for_a->rank_diffs[i] == 0);
+    for (size_t i = 5; i < 8; i++) {
+        if (ranks_for_a->rank_diffs[i] != 0) {
+            free_symbol_to_ranks_hash_map(map);
+            exit(EXIT_FAILURE);
+        }
     }
-    for (size_t i = 6; i < 9 ; i++) {
-        assert(ranks_for_b->rank_diffs[i] == 0);
+    for (size_t i = 6; i < 9; i++) {
+        if (ranks_for_b->rank_diffs[i] != 0) {
+            free_symbol_to_ranks_hash_map(map);
+            exit(EXIT_FAILURE);
+        }
     }
-    
+
     // ranks are    1, 1, 0, 1, 0, 1, 1, 1
     //           0, 0, 0, 1, 0, 1, 0, 0, 0
     // diffs are    0, 0, -1, 0, 0, 0, 1, 0
     //           0, 0, 0, 1, 0, 0, 0, -1, 0
-    assert(ranks_for_a->rank_diffs[2] == -1);
-    assert(ranks_for_a->rank_diffs[3] == 0);
-    assert(ranks_for_a->rank_diffs[4] == 0);
-    
-    assert(ranks_for_b->rank_diffs[2] == 0);
-    assert(ranks_for_b->rank_diffs[3] == 1);
-    assert(ranks_for_b->rank_diffs[4] == 0);
-    assert(ranks_for_b->rank_diffs[5] == 0);
+    if (ranks_for_a->rank_diffs[2] != -1) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->rank_diffs[3] != 0) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->rank_diffs[4] != 0) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+
+    if (ranks_for_b->rank_diffs[2] != 0) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->rank_diffs[3] != 1) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->rank_diffs[4] != 0) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->rank_diffs[5] != 0) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
     // first three rows did not have previous data for the diff
-    for (size_t i = 0; i < 2 ; i++) {
-        assert(ranks_for_a->went_up[i] == 0);
+    for (size_t i = 0; i < 2; i++) {
+        if (ranks_for_a->went_up[i] != 0) {
+            free_symbol_to_ranks_hash_map(map);
+            exit(EXIT_FAILURE);
+        }
     }
-    for (size_t i = 0; i < 2 ; i++) {
-        assert(ranks_for_b->went_up[i] == 0);
+    for (size_t i = 0; i < 2; i++) {
+        if (ranks_for_b->went_up[i] != 0) {
+            free_symbol_to_ranks_hash_map(map);
+            exit(EXIT_FAILURE);
+        }
     }
     // last three rows did not have enough the price lookahead
-    for (size_t i = 4; i < 8 ; i++) {
-        assert(ranks_for_a->went_up[i] == 0);
+    for (size_t i = 4; i < 8; i++) {
+        if (ranks_for_a->went_up[i] != 0) {
+            free_symbol_to_ranks_hash_map(map);
+            exit(EXIT_FAILURE);
+        }
     }
-    for (size_t i = 5; i < 9 ; i++) {
-        assert(ranks_for_b->went_up[i] == 0);
+    for (size_t i = 5; i < 9; i++) {
+        if (ranks_for_b->went_up[i] != 0) {
+            free_symbol_to_ranks_hash_map(map);
+            exit(EXIT_FAILURE);
+        }
     }
-    
+
     // went_up is    f, t
     //            t, f, t
-    assert(ranks_for_a->went_up[2] == false);
-    assert(ranks_for_a->went_up[3] == true);
+    if (ranks_for_a->went_up[2] != false) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->went_up[3] != true) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
-    assert(ranks_for_b->went_up[2] == false);
-    assert(ranks_for_b->went_up[3] == true);
-    assert(ranks_for_b->went_up[4] == true);
-    
-    assert(ranks_for_a->capacity == 8);
-    assert(ranks_for_b->capacity == 9);
+    if (ranks_for_b->went_up[2] != false) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->went_up[3] != true) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->went_up[4] != true) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+
+    if (ranks_for_a->size != 8) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->size != 9) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
     free_symbol_to_ranks_hash_map(map);
 }
 
 void rank_valid_stocks_by_low_handles_gaps() {
     SymbolToRanksHashMap* map = malloc(sizeof(SymbolToRanksHashMap));
-    assert(map != NULL);
+    if (map == NULL) {
+        perror("Failed to allocate map");
+        exit(EXIT_FAILURE);
+    }
     map->count = 0;
 
     // Stock a
@@ -235,7 +391,7 @@ void rank_valid_stocks_by_low_handles_gaps() {
         {{2023, 1, 3}, 11, 14, 12, 11, 100},
         {{2023, 1, 4}, 9, 21, 20, 9, 100}
     };
-    const StockDataTable table_for_a = {"a", rows_for_a, 4};
+    const StockDataTable table_for_a = {"a", rows_for_a, 4, 4};
 
     // Stock b
     StockDataRow rows_for_b[] = {
@@ -243,19 +399,24 @@ void rank_valid_stocks_by_low_handles_gaps() {
         {{2023, 1, 4}, 13, 18, 13, 13, 100},
         {{2023, 1, 5}, 14, 22, 21, 14, 100}
     };
-    const StockDataTable table_for_b = {"b", rows_for_b, 3};
+    const StockDataTable table_for_b = {"b", rows_for_b, 3, 3};
 
     const StockDataTables stock_tables = {
         .tables = (StockDataTable[]){table_for_a, table_for_b},
         .table_count = 2
     };
-    initialize_symbol_to_ranks_hash_map(&stock_tables, map);
-
+    if (!initialize_symbol_to_ranks_hash_map(&stock_tables, map)) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
     StockDataTable* valid_tables[2] = {
         &stock_tables.tables[0],
         &stock_tables.tables[1]
     };
-    rank_valid_stocks_by_low(map, valid_tables, 2);
+    if (!rank_valid_stocks_by_low(map, valid_tables, 2)) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
     const StockRanks* ranks_for_a =
         get_from_ranks_hash_map(map, table_for_a.stock_symbol);
@@ -263,68 +424,203 @@ void rank_valid_stocks_by_low_handles_gaps() {
         get_from_ranks_hash_map(map, table_for_b.stock_symbol);
 
     // Rank
-    assert(ranks_for_a->rank_per_day[0] == 0);
-    assert(ranks_for_a->rank_per_day[1] == 0);
-    assert(ranks_for_a->rank_per_day[2] == 0);
-    assert(ranks_for_a->rank_per_day[3] == 1);
-    assert(ranks_for_a->rank_per_day[4] == 0);
+    if (ranks_for_a->rank_per_day[0] != 0) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->rank_per_day[1] != 0) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->rank_per_day[2] != 0) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->rank_per_day[3] != 1) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->rank_per_day[4] != 0) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
-    assert(ranks_for_b->rank_per_day[0] == 1);
-    assert(ranks_for_b->rank_per_day[1] == 1);
-    assert(ranks_for_b->rank_per_day[2] == 0);
-    assert(ranks_for_b->rank_per_day[3] == 1);
+    if (ranks_for_b->rank_per_day[0] != 1) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->rank_per_day[1] != 1) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->rank_per_day[2] != 0) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->rank_per_day[3] != 1) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
     // Low
-    assert(ranks_for_a->low_per_day[0] == 14);
-    assert(ranks_for_a->low_per_day[1] == 13);
-    assert(ranks_for_a->low_per_day[2] == 12);
-    assert(ranks_for_a->low_per_day[3] == 20);
-    assert(ranks_for_a->low_per_day[4] == 20);
+    if (ranks_for_a->low_per_day[0] != 14) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->low_per_day[1] != 13) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->low_per_day[2] != 12) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->low_per_day[3] != 20) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->low_per_day[4] != 20) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
-    assert(ranks_for_b->low_per_day[0] == 14);
-    assert(ranks_for_b->low_per_day[1] == 14);
-    assert(ranks_for_b->low_per_day[2] == 13);
-    assert(ranks_for_b->low_per_day[3] == 21);
+    if (ranks_for_b->low_per_day[0] != 14) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->low_per_day[1] != 14) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->low_per_day[2] != 13) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->low_per_day[3] != 21) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
     // High
-    assert(ranks_for_a->high_per_day[0] == 15);
-    assert(ranks_for_a->high_per_day[1] == 16);
-    assert(ranks_for_a->high_per_day[2] == 14);
-    assert(ranks_for_a->high_per_day[3] == 21);
-    assert(ranks_for_a->high_per_day[4] == 21);
+    if (ranks_for_a->high_per_day[0] != 15) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->high_per_day[1] != 16) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->high_per_day[2] != 14) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->high_per_day[3] != 21) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->high_per_day[4] != 21) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
-    assert(ranks_for_b->high_per_day[0] == 16);
-    assert(ranks_for_b->high_per_day[1] == 16);
-    assert(ranks_for_b->high_per_day[2] == 18);
-    assert(ranks_for_b->high_per_day[3] == 22);
+    if (ranks_for_b->high_per_day[0] != 16) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->high_per_day[1] != 16) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->high_per_day[2] != 18) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->high_per_day[3] != 22) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+#pragma GCC diagnostic pop
 
     // Dates
-    assert(ranks_for_a->dates[0] == &rows_for_a[0].date);
-    assert(ranks_for_a->dates[1] == &rows_for_a[1].date);
-    assert(ranks_for_a->dates[2] == &rows_for_a[2].date);
-    assert(ranks_for_a->dates[3] == &rows_for_a[3].date);
-    assert(ranks_for_a->dates[4] == &rows_for_a[3].date);
+    if (ranks_for_a->dates[0] != &rows_for_a[0].date) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->dates[1] != &rows_for_a[1].date) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->dates[2] != &rows_for_a[2].date) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->dates[3] != &rows_for_a[3].date) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->dates[4] != &rows_for_a[3].date) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
 
-    assert(ranks_for_b->dates[0] == &rows_for_b[0].date);
-    assert(ranks_for_b->dates[1] == &rows_for_b[0].date);
-    assert(ranks_for_b->dates[2] == &rows_for_b[1].date);
-    assert(ranks_for_b->dates[3] == &rows_for_b[2].date);
+    if (ranks_for_b->dates[0] != &rows_for_b[0].date) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->dates[1] != &rows_for_b[0].date) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->dates[2] != &rows_for_b[1].date) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->dates[3] != &rows_for_b[2].date) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
     // rank diffs
-    assert(ranks_for_a->rank_diffs != NULL);
-    assert(ranks_for_a->went_up != NULL);
-    assert(ranks_for_a->capacity == 5);
+    if (ranks_for_a->rank_diffs == NULL) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->went_up == NULL) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_a->size != 5) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
     for (int i = 0; i < 5; i++) {
-        assert(ranks_for_a->rank_diffs[i] == 0);
+        if (ranks_for_a->rank_diffs[i] != 0) {
+            free_symbol_to_ranks_hash_map(map);
+            exit(EXIT_FAILURE);
+        }
     }
 
     // went up
-    assert(ranks_for_b->rank_diffs != NULL);
-    assert(ranks_for_b->went_up != NULL);
-    assert(ranks_for_b->capacity == 4);
+    if (ranks_for_b->rank_diffs == NULL) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->went_up == NULL) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
+    if (ranks_for_b->size != 4) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
     for (int i = 0; i < 4; i++) {
-        assert(ranks_for_b->rank_diffs[i] == 0);
+        if (ranks_for_b->rank_diffs[i] != 0) {
+            free_symbol_to_ranks_hash_map(map);
+            exit(EXIT_FAILURE);
+        }
     }
 
     free_symbol_to_ranks_hash_map(map);
@@ -369,17 +665,28 @@ void is_leap_year_returns_correct_result() {
 
 void get_from_ranks_hash_map_non_inserted_key_returns_null() {
     SymbolToRanksHashMap* map = malloc(sizeof(SymbolToRanksHashMap));
-    assert(map != NULL);
+    if (map == NULL) {
+        perror("Failed to allocate map");
+        exit(EXIT_FAILURE);
+    }
     map->count = 0;
     memset(map->symbol_to_ranks, 0, sizeof(map->symbol_to_ranks));
 
     auto const inserted_symbol = "abcd";
     StockRanks* sr = malloc(sizeof(StockRanks));
-    assert(sr != NULL);
+    if (sr == NULL) {
+        free_symbol_to_ranks_hash_map(map);
+        perror("Failed to allocate map");
+        exit(EXIT_FAILURE);
+    }
     memset(sr, 0, sizeof(StockRanks));
     sr->stock_symbol = inserted_symbol;
 
-    add_to_rank_hash_map(map, sr);
+    if (!add_to_rank_hash_map(map, sr)) {
+        free_symbol_to_ranks_hash_map(map);
+        free_stock_ranks(sr);
+        exit(EXIT_FAILURE);
+    }
 
     // Find a different key with the same hash
     const uint16_t target_hash = hash_symbol(inserted_symbol);
@@ -398,7 +705,11 @@ void get_from_ranks_hash_map_non_inserted_key_returns_null() {
 
     const StockRanks* result =
         get_from_ranks_hash_map(map, not_inserted_symbol);
-    assert(result == NULL);
+    if (result != NULL) {
+        free_symbol_to_ranks_hash_map(map);
+        free_stock_ranks(sr);
+        exit(EXIT_FAILURE);
+    }
     free_symbol_to_ranks_hash_map(map);
 }
 
@@ -420,9 +731,12 @@ void compare_by_low_sorts_correctly() {
 
     qsort(stocks, 3, sizeof(ActiveStock), compare_by_low);
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
     assert(stocks[0].table->rows[0].low == 5.0);
     assert(stocks[1].table->rows[0].low == 7.0);
     assert(stocks[2].table->rows[0].low == 10.0);
+#pragma GCC diagnostic pop
 }
 
 void is_date_less_or_equal_compares_correctly() {
@@ -609,35 +923,64 @@ void get_min_and_max_dates_finds_min_and_max() {
 
 void add_to_rank_hash_map_duplicates_insert() {
     SymbolToRanksHashMap* map = malloc(sizeof(SymbolToRanksHashMap));
-    assert(map != NULL);
+    if (map == NULL) {
+        perror("Failed to allocate map");
+        exit(EXIT_FAILURE);
+    }
     map->count = 0;
     memset(map->symbol_to_ranks, 0, sizeof(map->symbol_to_ranks));
 
     StockRanks* sr1 = malloc(sizeof(StockRanks));
-    assert(sr1 != NULL);
+    if (sr1 == NULL) {
+        free_symbol_to_ranks_hash_map(map);
+        perror("Failed to allocate stock ranks");
+        exit(EXIT_FAILURE);
+    }
     memset(sr1, 0, sizeof(StockRanks));
     sr1->stock_symbol = "aapl";
     StockRanks* sr2 = malloc(sizeof(StockRanks));
-    assert(sr2 != NULL);
+    if (sr2 == NULL) {
+        free_symbol_to_ranks_hash_map(map);
+        free_stock_ranks(sr1);
+        perror("Failed to allocate stock ranks");
+        exit(EXIT_FAILURE);
+    }
     memset(sr2, 0, sizeof(StockRanks));
     sr2->stock_symbol = "msft";
     StockRanks* sr3 = malloc(sizeof(StockRanks));
-    assert(sr3 != NULL);
+    if (sr3 == NULL) {
+        free_symbol_to_ranks_hash_map(map);
+        free_stock_ranks(sr1);
+        free_stock_ranks(sr2);
+        perror("Failed to allocate stock ranks");
+        exit(EXIT_FAILURE);
+    }
     memset(sr3, 0, sizeof(StockRanks));
     sr3->stock_symbol = "aapl";
 
-    add_to_rank_hash_map(map, sr1);
-    add_to_rank_hash_map(map, sr2);
-    add_to_rank_hash_map(map, sr3);
+    if (!add_to_rank_hash_map(map, sr1) ||
+        !add_to_rank_hash_map(map, sr2) ||
+        !add_to_rank_hash_map(map, sr3)
+    ) {
+        free_symbol_to_ranks_hash_map(map);
+        exit(EXIT_FAILURE);
+    }
 
     const StockRanks* r1 = get_from_ranks_hash_map(map, "aapl");
     const StockRanks* r2 = get_from_ranks_hash_map(map, "msft");
 
-    assert(map->count == 3);
-    assert(r1 != NULL);
-    assert((r1 == sr1));
-    assert(r2 != NULL);
-    assert((r2 == sr2));
+    if (map->count != 3 ||
+        r1 == NULL ||
+        r1 != sr1 ||
+        r2 == NULL ||
+        r2 != sr2
+    ) {
+        free_symbol_to_ranks_hash_map(map);
+        free_stock_ranks(sr1);
+        free_stock_ranks(sr2);
+        free_stock_ranks(sr3);
+        exit(EXIT_FAILURE);
+    }
     free_symbol_to_ranks_hash_map(map);
 }
 
@@ -661,10 +1004,15 @@ void initialize_symbol_to_ranks_hash_map_correctly_initializes() {
     assert(symbol_to_ranks_map != NULL);
     symbol_to_ranks_map->count = 0;
 
-    initialize_symbol_to_ranks_hash_map(
-        stock_data_tables,
-        symbol_to_ranks_map
-    );
+    if (!initialize_symbol_to_ranks_hash_map(
+            stock_data_tables,
+            symbol_to_ranks_map
+        )
+    ) {
+        free_stock_data_tables(stock_data_tables);
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        exit(EXIT_FAILURE);
+    }
 
     assert(symbol_to_ranks_map->count == 1);
 
@@ -674,7 +1022,7 @@ void initialize_symbol_to_ranks_hash_map_correctly_initializes() {
     );
     assert(stock_ranks);
     assert(stock_ranks->current_index == 0);
-    assert(stock_ranks->capacity == LARGEST_STOCK_DATASET_SIZE * 2);
+    assert(stock_ranks->size == LARGEST_STOCK_DATASET_SIZE * 2);
     assert(stock_ranks->stock_symbol == stock_table->stock_symbol);
     assert(stock_ranks->rank_per_day != NULL);
     assert(stock_ranks->low_per_day != NULL);

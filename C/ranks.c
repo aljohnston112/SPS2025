@@ -13,7 +13,7 @@
  * @return A negative number if a's current low is less than b's current low,
  *         a positive number if b's is greater than a's, else 0.
  */
-int compare_by_low(const void* a, const void* b) {
+__attribute__((pure)) int compare_by_low(const void* a, const void* b) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wcast-qual"
     const ActiveStock* stock_a = ((ActiveStock*)a);
@@ -39,7 +39,7 @@ int compare_by_low(const void* a, const void* b) {
  * @param buy_sell_lag The number of days after a diff to query the price
  *                     for a rank's went_up.
  */
-void rank_stocks_by_low(
+bool rank_stocks_by_low(
     const StockDataTables* stock_data_tables,
     const SymbolToRanksHashMap* all_stock_ranks,
     const size_t days_per_diff,
@@ -58,7 +58,7 @@ void rank_stocks_by_low(
             stderr,
             "Failed to allocate memory for inactive_stock_tables"
         );
-        exit(EXIT_FAILURE);
+        return false;
     }
 
     size_t valid_count = 0;
@@ -69,11 +69,15 @@ void rank_stocks_by_low(
         }
     }
 
-    rank_valid_stocks_by_low(
-        all_stock_ranks,
-        stock_tables,
-        valid_count
-    );
+    if (!rank_valid_stocks_by_low(
+            all_stock_ranks,
+            stock_tables,
+            valid_count
+        )
+    ) {
+        free(stock_tables);
+        return false;
+    }
 
     create_rank_diffs(
         all_stock_ranks,
@@ -84,6 +88,8 @@ void rank_stocks_by_low(
     // stock_tables needs to be freed
     // -------------------------------------------------------------------------
     free(stock_tables);
+
+    return true;
 }
 
 /**
@@ -95,7 +101,7 @@ void rank_stocks_by_low(
  *                           Note that this list of tables will be mutated.
  * @param valid_stock_count The number of stock tables in valid_stock_tables.
  */
-void rank_valid_stocks_by_low(
+bool rank_valid_stocks_by_low(
     const SymbolToRanksHashMap* all_stock_ranks,
     StockDataTable** valid_stock_tables,
     const size_t valid_stock_count
@@ -106,7 +112,7 @@ void rank_valid_stocks_by_low(
         calloc(valid_stock_count, sizeof(ActiveStock));
     if (active_stocks == NULL) {
         perror("malloc failed");
-        exit(EXIT_FAILURE);
+        return false;
     }
     size_t active_count = 0;
 
@@ -156,7 +162,10 @@ void rank_valid_stocks_by_low(
         // move current index to the previous day if data is missing for today
         for (size_t j = 0; j < active_count; ++j) {
             ActiveStock* active_stock = &active_stocks[j];
-            assert(active_stock != NULL);
+            if (active_stock == NULL) {
+                free(active_stocks);
+                return false;
+            }
             const size_t current_index = active_stock->current_index;
             const StockDataTable* active_stock_table = active_stock->table;
             if (current_index < active_stock_table->row_count) {
@@ -164,11 +173,17 @@ void rank_valid_stocks_by_low(
                     &active_stock_table->rows[current_index];
                 const Date* row_date = &row->date;
                 if (is_date_less(&current_date, row_date)) {
-                    assert(active_stock->current_index > 0);
+                    if (active_stock->current_index <= 0) {
+                        free(active_stocks);
+                        return false;
+                    }
                     active_stock->current_index--;
                 }
             } else {
-                assert(active_stock->current_index > 0);
+                if (active_stock->current_index <= 0) {
+                    free(active_stocks);
+                    return false;
+                }
                 active_stock->current_index--;
             }
         }
@@ -193,11 +208,17 @@ void rank_valid_stocks_by_low(
                 all_stock_ranks,
                 table->stock_symbol
             );
-            assert(stock_rank != NULL);
+            if (stock_rank == NULL) {
+                free(active_stocks);
+                return false;
+            }
             const size_t current_rank_index = stock_rank->current_index;
             const StockDataRow* row = &table->rows[active_stock->current_index];
 
-            assert(current_rank_index < stock_rank->capacity);
+            if (current_rank_index >= stock_rank->size) {
+                free(active_stocks);
+                return false;
+            }
 
             // TODO year 0?
             if (row->date.year != 0) {
@@ -215,29 +236,37 @@ void rank_valid_stocks_by_low(
     // Allocate space for the rank diffs and went up series
     for (size_t j = 0; j < RANK_MAP_SIZE; j++) {
         StockRanks* stock_ranks = all_stock_ranks->symbol_to_ranks[j];
-        if (stock_ranks) {
+        if (stock_ranks != nullptr) {
             const size_t rank_data_size = stock_ranks->current_index;
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wanalyzer-malloc-leak"
             // These are freed by the caller
             stock_ranks->rank_diffs =
                 calloc(rank_data_size, sizeof(int64_t));
-            if (stock_ranks->rank_diffs == NULL) {
+            if (stock_ranks->rank_diffs == nullptr) {
+                free(active_stocks);
                 perror("calloc failed");
-                exit(EXIT_FAILURE);
+                return false;
             }
+
             stock_ranks->went_up =
                 calloc(rank_data_size, sizeof(bool));
-            if (stock_ranks->went_up == NULL) {
+            if (stock_ranks->went_up == nullptr) {
+                free(active_stocks);
                 perror("calloc failed");
-                exit(EXIT_FAILURE);
+                return false;
             }
-            stock_ranks->capacity = rank_data_size;
+#pragma GCC diagnostic pop
+            stock_ranks->size = rank_data_size;
         }
     }
 
     // active_stocks freed
     // -------------------------------------------------------------------------
     free(active_stocks);
+
+    return true;
 }
 
 /**
@@ -261,13 +290,13 @@ void create_rank_diffs(
             // (the diff size) + (the day after_diff) + (the price lag)
             // the diff requires an extra day
             // to ensure there are enough points for the diff
-            stock_ranks->capacity < (days_per_diff + 1) + (1) + (buy_sell_lag)
+            stock_ranks->size < (days_per_diff + 1) + (1) + (buy_sell_lag)
         ) {
             continue;
         }
         for (size_t i = days_per_diff;
              // (the data size) - (the day after a diff) - (the price lag)
-             i < (stock_ranks->capacity) - (1) - (buy_sell_lag);
+             i < (stock_ranks->size) - (1) - (buy_sell_lag);
              i++
         ) {
             stock_ranks->rank_diffs[i] =

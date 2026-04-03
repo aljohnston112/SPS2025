@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stddef.h>
 
 /**
  * Allocates space for the rank data in the given symbol_to_ranks_hash_map.
@@ -14,7 +15,7 @@
  *                          in the symbol_to_ranks_hash_map.
  * @param symbol_to_ranks_hash_map The SymbolToRanksHashMap to initialize.
  */
-void initialize_symbol_to_ranks_hash_map(
+bool initialize_symbol_to_ranks_hash_map(
     const StockDataTables* stock_data_tables,
     SymbolToRanksHashMap* symbol_to_ranks_hash_map
 ) {
@@ -31,66 +32,64 @@ void initialize_symbol_to_ranks_hash_map(
     for (size_t i = 0; i < number_of_stocks; ++i) {
         const StockDataTable* table = &stock_data_tables->tables[i];
 
+        // stock_ranks must be freed
+        // ---------------------------------------------------------------------
         StockRanks* stock_ranks = malloc(sizeof(StockRanks));
         if (stock_ranks == NULL) {
-            fprintf(stderr, "Failed to allocate memory for stock_ranks");
-            exit(EXIT_FAILURE);
+            perror("Failed to allocate memory for stock_ranks");
+            return false;
         }
+        memset(stock_ranks, 0, sizeof(StockRanks));
         stock_ranks->stock_symbol = table->stock_symbol;
-        stock_ranks->rank_per_day = calloc(
-            number_of_rows,
-            sizeof(size_t)
-        );
-        if (stock_ranks->rank_per_day == NULL) {
-            fprintf(
-                stderr,
-                "Failed to allocate memory for stock_ranks->rank_per_day"
-            );
-            exit(EXIT_FAILURE);
+
+        stock_ranks->rank_per_day =
+            calloc(number_of_rows, sizeof(int64_t));
+        if (!stock_ranks->rank_per_day) {
+            free_stock_ranks(stock_ranks);
+            perror("calloc failed");
+            return false;
         }
-        stock_ranks->low_per_day = calloc(
-            number_of_rows,
-            sizeof(double)
-        );
-        if (stock_ranks->low_per_day == NULL) {
-            fprintf(
-                stderr,
-                "Failed to allocate memory for stock_ranks->low_per_day"
-            );
-            exit(EXIT_FAILURE);
+
+        stock_ranks->low_per_day =
+            calloc(number_of_rows, sizeof(double));
+        if (!stock_ranks->low_per_day) {
+            free_stock_ranks(stock_ranks);
+            perror("calloc failed");
+            return false;
         }
-        stock_ranks->high_per_day = calloc(
-            number_of_rows,
-            sizeof(double)
-        );
-        if (stock_ranks->high_per_day == NULL) {
-            fprintf(
-                stderr,
-                "Failed to allocate memory for stock_ranks->high_per_day"
-            );
-            exit(EXIT_FAILURE);
+
+        stock_ranks->high_per_day =
+            calloc(number_of_rows, sizeof(double));
+        if (!stock_ranks->high_per_day) {
+            free_stock_ranks(stock_ranks);
+            perror("calloc failed");
+            return false;
         }
-        stock_ranks->dates = calloc(
-            number_of_rows,
-            sizeof(Date*)
-        );
-        if (stock_ranks->dates == NULL) {
-            fprintf(
-                stderr,
-                "Failed to allocate memory for stock_ranks->dates"
-            );
-            exit(EXIT_FAILURE);
+
+        stock_ranks->dates =
+            calloc(number_of_rows, sizeof(Date*));
+        if (!stock_ranks->dates) {
+            free_stock_ranks(stock_ranks);
+            perror("calloc failed");
+            return false;
         }
+
         stock_ranks->current_index = 0;
-        stock_ranks->capacity = number_of_rows;
+        stock_ranks->size = number_of_rows;
         // rank_diffs and went_up are initialized after generating ranks
         stock_ranks->rank_diffs = nullptr;
         stock_ranks->went_up = nullptr;
-        add_to_rank_hash_map(
-            symbol_to_ranks_hash_map,
-            stock_ranks
-        );
+
+        if (!add_to_rank_hash_map(
+                symbol_to_ranks_hash_map,
+                stock_ranks
+            )
+        ) {
+            free_stock_ranks(stock_ranks);
+            return false;
+        }
     }
+    return true;
 }
 
 /**
@@ -99,7 +98,7 @@ void initialize_symbol_to_ranks_hash_map(
  * @param symbol_to_ranks_map The map to add the stack ranks to.
  * @param stock_ranks The stock ranks to add to the map.
  */
-void add_to_rank_hash_map(
+bool add_to_rank_hash_map(
     SymbolToRanksHashMap* symbol_to_ranks_map,
     StockRanks* stock_ranks
 ) {
@@ -114,10 +113,16 @@ void add_to_rank_hash_map(
         i++;
         index = (key + (i * i)) % RANK_MAP_SIZE;
     }
-    assert(symbol_to_ranks_map->symbol_to_ranks[index] == NULL);
-    symbol_to_ranks_map->symbol_to_ranks[index] = stock_ranks;
+    if (symbol_to_ranks_map->symbol_to_ranks[index] != NULL) {
+        return false;
+    }
     symbol_to_ranks_map->count++;
-    assert(symbol_to_ranks_map->count < RANK_MAP_SIZE / 2);
+    if (symbol_to_ranks_map->count >= RANK_MAP_SIZE / 2) {
+        return false;
+    }
+
+    symbol_to_ranks_map->symbol_to_ranks[index] = stock_ranks;
+    return true;
 }
 
 /**
@@ -126,7 +131,7 @@ void add_to_rank_hash_map(
  * @param symbol The symbol to hash.
  * @return The hash of the given symbol.
  */
-uint16_t hash_symbol(const char* symbol) {
+__attribute__((pure)) uint16_t hash_symbol(const char* symbol) {
     // Hash was over 2 times faster than gpref in production testing
     uint16_t hash = 0;
     for (int i = 0; symbol[i]; i++) {
@@ -143,7 +148,7 @@ uint16_t hash_symbol(const char* symbol) {
  * @param stock_symbol The stock symbol.
  * @return The rank series for the stock if it is in the map, else null.
  */
-StockRanks* get_from_ranks_hash_map(
+__attribute__((pure)) StockRanks* get_from_ranks_hash_map(
     const SymbolToRanksHashMap* map,
     const char* stock_symbol
 ) {
@@ -160,7 +165,17 @@ StockRanks* get_from_ranks_hash_map(
         }
         i++;
     }
-    assert(false);
+    unreachable();
+}
+
+void free_stock_ranks(StockRanks* sr) {
+    free(sr->rank_per_day);
+    free(sr->low_per_day);
+    free(sr->high_per_day);
+    free(sr->dates);
+    free(sr->rank_diffs);
+    free(sr->went_up);
+    free(sr);
 }
 
 /**
@@ -173,13 +188,7 @@ void free_symbol_to_ranks_hash_map(
     for (size_t i = 0; i < RANK_MAP_SIZE; ++i) {
         StockRanks* sr = symbol_to_ranks_hash_map->symbol_to_ranks[i];
         if (sr) {
-            free(sr->rank_per_day);
-            free(sr->low_per_day);
-            free(sr->high_per_day);
-            free(sr->dates);
-            free(sr->rank_diffs);
-            free(sr->went_up);
-            free(sr);
+            free_stock_ranks(sr);
         }
     }
     free(symbol_to_ranks_hash_map);

@@ -1,9 +1,7 @@
 #include "MappedFileCursor.h"
 
-#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -28,26 +26,25 @@ void mapped_file_cursor_clean_up(const MappedFileCursor* self) {
  * Loads a file into memory.
  * @param self
  * @param filename
- * @return If open, fstat, mmap fail, then errno will be returned, else 0.
+ * @return If open, fstat, mmap fail, false, else true.
  */
 int mapped_file_cursor_map_file(MappedFileCursor* self, const char* filename) {
     const int fd = open(filename, O_RDONLY);
     if (fd == -1) {
         perror("Error opening file");
-        fprintf(stderr, "Error: %s\n", strerror(errno));
-        return errno;
+        return false;
     }
 
     struct stat st;
     if (fstat(fd, &st) == -1) {
         perror("Error getting file stats");
         close(fd);
-        return errno;
+        return -1;
     }
 
     if (st.st_size == 0) {
         close(fd);
-        return -1;
+        return 1;
     }
 
     const int long page_size = get_page_size();
@@ -65,7 +62,7 @@ int mapped_file_cursor_map_file(MappedFileCursor* self, const char* filename) {
     if (startp == MAP_FAILED) {
         perror("Error mapping anonymous memory");
         close(fd);
-        return errno;
+        return -1;
     }
 
     self->guardPtr = startp + rounded;
@@ -83,7 +80,7 @@ int mapped_file_cursor_map_file(MappedFileCursor* self, const char* filename) {
         perror("Error mapping file");
         munmap(startp, (size_t)(rounded + page_size));
         close(fd);
-        return errno;
+        return -1;
     }
 
     close(fd);

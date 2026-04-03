@@ -67,7 +67,7 @@ void string_spanner_init(
     );
 }
 
-int string_spanner_operator(
+__attribute__((pure)) int string_spanner_operator(
     const StringSpanner* self,
     char* buf
 ) {

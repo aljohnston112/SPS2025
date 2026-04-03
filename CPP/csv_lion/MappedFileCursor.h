@@ -27,8 +27,13 @@ static inline long int mapped_file_cursor_size(const MappedFileCursor* self) {
 }
 
 
-static inline void mapped_file_cursor_consume(MappedFileCursor* self, const long int n) {
-    self->currentPtr += (n < mapped_file_cursor_size(self)) ? n : mapped_file_cursor_size(self);
+static inline void mapped_file_cursor_consume(
+    MappedFileCursor* self,
+    const long int n
+) {
+    self->currentPtr += n < mapped_file_cursor_size(self)
+                            ? n
+                            : mapped_file_cursor_size(self);
 }
 
 #endif //MAPPEDFILECURSOR_H

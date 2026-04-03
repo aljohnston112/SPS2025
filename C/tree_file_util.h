@@ -34,7 +34,7 @@ void get_prediction(
 
 // Other methods
 
-void save_yearly_tries();
+bool save_yearly_tries();
 
 void export_trie_to_file(const SequenceCountingTrie* trie, FILE* output_file);
 

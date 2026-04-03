@@ -4,7 +4,6 @@
 #include <sys/types.h>
 
 #ifdef __cplusplus
-#include <cstddef>
 
 extern "C" {
 #else
@@ -13,7 +12,7 @@ extern "C" {
 
 typedef struct CsvCell {
     char* ptr;
-    long int size;
+    __uint64_t size;
 } CsvCell;
 
 char* csv_cell_as_str(const CsvCell* self);

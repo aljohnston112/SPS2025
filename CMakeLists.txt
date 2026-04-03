@@ -5,7 +5,11 @@ if (USE_GCC)
     set(CMAKE_C_COMPILER "gcc")
     set(CMAKE_CXX_COMPILER "g++")
     set(COMMON_COMPILE_FLAGS
-            -msse4.2
+            -pthread
+            -march=native
+            -mbmi
+            -mavx512f
+            -mavx512bw
             -g
             -fno-omit-frame-pointer
             -Wall
@@ -67,12 +71,19 @@ if (USE_GCC)
             -Wstack-usage=8192
             -fstack-protector
             --param=analyzer-max-svalue-depth=50
+            -mtune=native
+            -flto
+            #-O3
     )
 else ()
     set(CMAKE_C_COMPILER "clang")
     set(CMAKE_CXX_COMPILER "clang++")
     set(COMMON_COMPILE_FLAGS
-            -msse4.2
+            -pthread
+            -march=native
+            -mbmi
+            -mavx512f
+            -mavx512bw
             -g
             -fno-omit-frame-pointer
             -Wall
@@ -81,9 +92,11 @@ else ()
     )
 endif ()
 
-set(COMMON_LINK_FLAGS)
+set(COMMON_LINK_FLAGS
 
-set(ENABLE_COVERAGE true)
+)
+
+set(ENABLE_COVERAGE false)
 if (ENABLE_COVERAGE)
     list(APPEND COMMON_COMPILE_FLAGS --coverage)
 endif ()
@@ -94,7 +107,7 @@ set(CMAKE_C_STANDARD 23)
 set(CMAKE_CXX_STANDARD 20)
 
 set(USE_ASAN FALSE)
-set(PARALLEL TRUE)
+set(PARALLEL FALSE)
 
 set(
         CXX_SOURCE_FILES
@@ -233,6 +246,7 @@ if (PARALLEL)
     target_link_libraries(SPS2025Test PRIVATE m OpenMP::OpenMP_C)
 endif ()
 file(COPY C_tests/test_data DESTINATION ${CMAKE_BINARY_DIR})
+file(COPY C_tests/test_empty DESTINATION ${CMAKE_BINARY_DIR})
 
 if (ENABLE_COVERAGE)
     target_link_libraries(SPS2025Test PRIVATE gcov)

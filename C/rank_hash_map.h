@@ -5,7 +5,7 @@
 #include "file_util.h"
 
 typedef struct {
-    char* stock_symbol;
+    const char* stock_symbol;
     int64_t* rank_per_day;
     double* low_per_day;
     double* high_per_day;
@@ -13,7 +13,7 @@ typedef struct {
     int64_t* rank_diffs;
     bool* went_up;
     size_t current_index;
-    size_t capacity;
+    size_t size;
 } StockRanks;
 
 typedef struct {
@@ -21,12 +21,12 @@ typedef struct {
     size_t count;
 } SymbolToRanksHashMap;
 
-void initialize_symbol_to_ranks_hash_map(
+bool initialize_symbol_to_ranks_hash_map(
     const StockDataTables* stock_data_tables,
     SymbolToRanksHashMap* symbol_to_ranks_hash_map
 );
 
-void add_to_rank_hash_map(
+bool add_to_rank_hash_map(
     SymbolToRanksHashMap* symbol_to_ranks_map,
     StockRanks* stock_ranks
 );
@@ -38,6 +38,10 @@ StockRanks* get_from_ranks_hash_map(
     const char* stock_symbol
 );
 
-void free_symbol_to_ranks_hash_map(SymbolToRanksHashMap* symbol_to_ranks_hash_map);
+void free_stock_ranks(StockRanks* sr);
+
+void free_symbol_to_ranks_hash_map(
+    SymbolToRanksHashMap* symbol_to_ranks_hash_map
+);
 
 #endif //SPS2025_RANK_HASH_MAP_H

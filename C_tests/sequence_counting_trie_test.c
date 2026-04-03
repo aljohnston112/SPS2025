@@ -97,16 +97,16 @@ add_to_hash_map_or_get_with_collision_and_a_resize_contains_all_nodes_after_resi
     assert(node != NULL && node->key == dup_key);
     assert(node->map);
     assert(node->capacity == START_MAP_SIZE);
-    node->count_down = dup_key;
-    node->count_up = dup_key * dup_key;
+    node->count_down = (uint64_t)dup_key;
+    node->count_up = (uint64_t)(dup_key * dup_key);
 
     assert(root->current_size == 2);
 
     // Trigger resize
     const uint64_t till_resize = root->capacity / 2;
     for (uint64_t i = 0; i < till_resize; i++) {
-        node = add_to_trie_or_get(root, i + 2);
-        assert(node != NULL && node->key == i + 2);
+        node = add_to_trie_or_get(root, (long)(i + 2));
+        assert(node != NULL && node->key == (long)(i + 2));
         assert(node->map);
         assert(node->capacity == START_MAP_SIZE);
         node->count_down = i + 2;
@@ -202,87 +202,149 @@ void fill_trie_fills_trie_correctly() {
         .went_up = (bool[]){
             false, true, false, true, false, false, false, false, true
         },
-        .capacity = 9
+        .size = 9
     };
 
     auto stock_rank1 = (StockRanks){
         .stock_symbol = "b",
         .rank_diffs = (int64_t[]){0, 1, 0},
         .went_up = (bool[]){false, true, false},
-        .capacity = 3
+        .size = 3
     };
     SymbolToRanksHashMap* symbol_to_ranks_map =
         calloc(1, sizeof(SymbolToRanksHashMap));
-    add_to_rank_hash_map(symbol_to_ranks_map, &stock_rank0);
-    add_to_rank_hash_map(symbol_to_ranks_map, &stock_rank1);
+    if (!add_to_rank_hash_map(symbol_to_ranks_map, &stock_rank0) ||
+        !add_to_rank_hash_map(symbol_to_ranks_map, &stock_rank1)
+    ) {
+        exit(EXIT_FAILURE);
+    }
 
     SequenceCountingTrie* trie = create_sequence_counting_trie(-1);
+    if (!trie) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        exit(EXIT_FAILURE);
+    }
     fill_trie(symbol_to_ranks_map, trie, 1, 2, 3);
 
     const SequenceCountingTrie* child0 = get_from_trie(trie, 0);
-    assert(child0->count_down == 2);
-    assert(child0->count_up == 0);
-    assert(child0->current_size == 1);
-    assert(child0->key == 0);
+    if (child0->count_down != 2 ||
+        child0->count_up != 0 ||
+        child0->current_size != 1 ||
+        child0->key != 0
+    ) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
     const SequenceCountingTrie* child01 = get_from_trie(child0, 1);
-    assert(child01->count_down == 0);
-    assert(child01->count_up == 1);
-    assert(child01->current_size == 1);
-    assert(child01->key == 1);
+    if (child01->count_down != 0 ||
+        child01->count_up != 1 ||
+        child01->current_size != 1 ||
+        child01->key != 1
+    ) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
     const SequenceCountingTrie* child012 = get_from_trie(child01, 2);
-    assert(child012->count_down == 1);
-    assert(child012->count_up == 0);
-    assert(child012->current_size == 0);
-    assert(child012->key == 2);
+    if (child012->count_down != 1 ||
+        child012->count_up != 0 ||
+        child012->current_size != 0 ||
+        child012->key != 2
+    ) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
-    auto child1 = get_from_trie(trie, 1);
-    assert(child1->count_down == 0);
-    assert(child1->count_up == 2);
-    assert(child1->current_size == 2);
-    assert(child1->key == 1);
+    auto const child1 = get_from_trie(trie, 1);
+    if (child1->count_down != 0 ||
+        child1->count_up != 2 ||
+        child1->current_size != 2 ||
+        child1->key != 1
+    ) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
     const SequenceCountingTrie* child10 = get_from_trie(child1, 0);
-    assert(child10->count_down == 1);
-    assert(child10->count_up == 0);
-    assert(child10->current_size == 1);
-    assert(child10->key == 0);
+    if (child10->count_down != 1 ||
+        child10->count_up != 0 ||
+        child10->current_size != 1 ||
+        child10->key != 0
+    ) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
     const SequenceCountingTrie* child101 = get_from_trie(child10, 1);
-    assert(child101->count_down == 0);
-    assert(child101->count_up == 1);
-    assert(child101->current_size == 0);
-    assert(child101->key == 1);
+    if (child101->count_down != 0 ||
+        child101->count_up != 1 ||
+        child101->current_size != 0 ||
+        child101->key != 1
+    ) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
     const SequenceCountingTrie* child12 = get_from_trie(child1, 2);
-    assert(child12->count_down == 1);
-    assert(child12->count_up == 0);
-    assert(child12->current_size == 1);
-    assert(child12->key == 2);
+    if (child12->count_down != 1 ||
+        child12->count_up != 0 ||
+        child12->current_size != 1 ||
+        child12->key != 2
+    ) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
     const SequenceCountingTrie* child120 = get_from_trie(child12, 0);
-    assert(child120->count_down == 1);
-    assert(child120->count_up == 0);
-    assert(child120->current_size == 0);
-    assert(child120->key == 0);
+    if (child120->count_down != 1 ||
+        child120->count_up != 0 ||
+        child120->current_size != 0 ||
+        child120->key != 0
+    ) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
     const SequenceCountingTrie* child2 = get_from_trie(trie, 2);
-    assert(child2->count_down == 1);
-    assert(child2->count_up == 0);
-    assert(child2->current_size == 1);
-    assert(child2->key == 2);
+    if (child2->count_down != 1 ||
+        child2->count_up != 0 ||
+        child2->current_size != 1 ||
+        child2->key != 2
+    ) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
     const SequenceCountingTrie* child20 = get_from_trie(child2, 0);
-    assert(child20->count_down == 1);
-    assert(child20->count_up == 0);
-    assert(child20->current_size == 0);
-    assert(child20->key == 0);
+    if (child20->count_down != 1 ||
+        child20->count_up != 0 ||
+        child20->current_size != 0 ||
+        child20->key != 0
+    ) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
     const SequenceCountingTrie* child201 = get_from_trie(child20, 1);
-    assert(child201 == nullptr);
-
+    if (child201 != nullptr
+    ) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
     free(symbol_to_ranks_map);
+    free_trie(trie);
 }
 
 void get_prediction_from_trie_returns_correct_predictions() {
@@ -292,13 +354,20 @@ void get_prediction_from_trie_returns_correct_predictions() {
         .went_up = (bool[]){
             false, true, false, true, false, false, false, false, true
         },
-        .capacity = 9
+        .size = 9
     };
     SymbolToRanksHashMap* symbol_to_ranks_map =
         calloc(1, sizeof(SymbolToRanksHashMap));
-    add_to_rank_hash_map(symbol_to_ranks_map, &stock_rank0);
+    if (!add_to_rank_hash_map(symbol_to_ranks_map, &stock_rank0)) {
+        perror("Failed to allocate map");
+        exit(EXIT_FAILURE);
+    }
 
     SequenceCountingTrie* trie = create_sequence_counting_trie(-1);
+    if (trie == nullptr) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        exit(EXIT_FAILURE);
+    }
     fill_trie(symbol_to_ranks_map, trie, 1, 2, 3);
 
     double prediction = 0;
@@ -310,7 +379,14 @@ void get_prediction_from_trie_returns_correct_predictions() {
         &prediction,
         &depth
     );
-    assert(prediction == 1);
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
+    if(prediction != 1) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
     get_prediction_from_trie(
         trie,
@@ -319,7 +395,12 @@ void get_prediction_from_trie_returns_correct_predictions() {
         &prediction,
         &depth
     );
-    assert(prediction == -1);
+
+    if(prediction != -1) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
     get_prediction_from_trie(
         trie,
@@ -328,7 +409,11 @@ void get_prediction_from_trie_returns_correct_predictions() {
         &prediction,
         &depth
     );
-    assert(prediction == -1);
+    if(prediction != -1) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
     get_prediction_from_trie(
         trie,
@@ -337,7 +422,11 @@ void get_prediction_from_trie_returns_correct_predictions() {
         &prediction,
         &depth
     );
-    assert(prediction == -1);
+    if(prediction != -1) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
     get_prediction_from_trie(
         trie,
@@ -346,7 +435,11 @@ void get_prediction_from_trie_returns_correct_predictions() {
         &prediction,
         &depth
     );
-    assert(prediction == 1);
+    if(prediction != 1) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
     get_prediction_from_trie(
         trie,
@@ -355,7 +448,11 @@ void get_prediction_from_trie_returns_correct_predictions() {
         &prediction,
         &depth
     );
-    assert(prediction == -1);
+    if(prediction != -1) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
     get_prediction_from_trie(
         trie,
@@ -364,7 +461,11 @@ void get_prediction_from_trie_returns_correct_predictions() {
         &prediction,
         &depth
     );
-    assert(prediction == 1);
+    if(prediction != 1) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
     get_prediction_from_trie(
         trie,
@@ -373,7 +474,11 @@ void get_prediction_from_trie_returns_correct_predictions() {
         &prediction,
         &depth
     );
-    assert(prediction == -1);
+    if(prediction != -1) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
     get_prediction_from_trie(
         trie,
@@ -382,7 +487,11 @@ void get_prediction_from_trie_returns_correct_predictions() {
         &prediction,
         &depth
     );
-    assert(prediction == -1);
+    if(prediction != -1) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
 
     get_prediction_from_trie(
         trie,
@@ -391,9 +500,21 @@ void get_prediction_from_trie_returns_correct_predictions() {
         &prediction,
         &depth
     );
-    assert(prediction == -1);
+    if(prediction != -1) {
+        free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+        free_trie(trie);
+        exit(EXIT_FAILURE);
+    }
+#pragma GCC diagnostic pop
 
-    printf("");
+    for (size_t i = 0; i < symbol_to_ranks_map->count; i++) {
+        symbol_to_ranks_map->symbol_to_ranks[i]->rank_diffs = nullptr;
+        symbol_to_ranks_map->symbol_to_ranks[i]->went_up = nullptr;
+        symbol_to_ranks_map->symbol_to_ranks[i] = nullptr;
+    }
+
+    free_symbol_to_ranks_hash_map(symbol_to_ranks_map);
+    free_trie(trie);
 }
 
 void run_tree_test() {

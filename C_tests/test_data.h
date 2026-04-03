@@ -10,8 +10,8 @@ typedef struct {
     double open, high, low, close, volume;
 } ExpectedRow;
 
-#define FAKE_DATA_FILE_NAME "./test_data/fake_data.txt"
-#define FAKE_DATA_FILE_NAME2 "./test_data/fake_data2.txt"
+static const char* const FAKE_DATA_FILE_NAME = "./test_data/fake_data.txt";
+static const char* const FAKE_DATA_FILE_NAME2 = "./test_data/fake_data2.txt";
 
 static const ExpectedRow expected_rows_for_fake_data[ROWS_IN_TEST_FILE] = {
     {
@@ -81,11 +81,14 @@ static inline void check_table(
                 &row->date, &expected_row.date,
                 sizeof(Date)
             ) == 0);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfloat-equal"
         assert(row->open == expected_row.open);
         assert(row->high == expected_row.high);
         assert(row->low == expected_row.low);
         assert(row->close == expected_row.close);
         assert(row->volume == expected_row.volume);
+#pragma GCC diagnostic pop
     }
 }
 

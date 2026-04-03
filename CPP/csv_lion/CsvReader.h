@@ -20,7 +20,6 @@ void csv_reader_init(
     char delimiter
 );
 int csv_reader_try_parse(CsvReader* reader);
-bool csv_reader_read_row(CsvReader* reader);
-CsvCursor* csv_reader_row(CsvReader* reader);
+int csv_reader_read_row(CsvReader* reader);
 
 #endif //CSVREADER_H
