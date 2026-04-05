@@ -22,28 +22,23 @@ static inline bool parse_row(
     const u_int16_t year
 ) {
     const char* date = header_cells.date->ptr;
-    const uint8_t current_month = (uint8_t)((date[4] - '0') * 10 + (date[5] - '0'));
-    const uint8_t current_day = (uint8_t)((date[6] - '0') * 10 + (date[7] - '0'));
+    const uint8_t current_month =
+        (uint8_t)((date[4] - '0') * 10 + (date[5] - '0'));
+    const uint8_t current_day =
+        (uint8_t)((date[6] - '0') * 10 + (date[7] - '0'));
     current_row->date = (Date){
         .year = year,
         .month = current_month,
         .day = current_day
     };
 
-    // Load the first row
-    if (csv_cell_as_double(header_cells.open, &current_row->open) != 0) {
-        return false;
-    }
-    if (csv_cell_as_double(header_cells.high, &current_row->high) != 0) {
-        return false;
-    }
-    if (csv_cell_as_double(header_cells.low, &current_row->low) != 0) {
-        return false;
-    }
-    if (csv_cell_as_double(header_cells.close, &current_row->close) != 0) {
-        return false;
-    }
-    if (csv_cell_as_double(header_cells.volume, &current_row->volume) != 0) {
+    register int row_status = 0;
+    row_status |= csv_cell_as_double(header_cells.open, &current_row->open);
+    row_status |= csv_cell_as_double(header_cells.high, &current_row->high);
+    row_status |= csv_cell_as_double(header_cells.low, &current_row->low);
+    row_status |= csv_cell_as_double(header_cells.close, &current_row->close);
+    row_status |= csv_cell_as_double(header_cells.volume, &current_row->volume);
+    if (unlikely(row_status != 0)) {
         return false;
     }
     return true;
@@ -144,7 +139,6 @@ bool read_stock_csv(
         }
 
         const char* date = dateCell->ptr;
-        StockDataRow* current_row = &table->rows[data_index];
         const uint16_t year = (uint16_t)((date[0] - '0') * 1000 +
             (date[1] - '0') * 100 +
             (date[2] - '0') * 10 +
@@ -158,11 +152,10 @@ bool read_stock_csv(
             break;
         }
 
+        StockDataRow* current_row = &table->rows[data_index++];
         if (!parse_row(header_cells, current_row, year)) {
             goto error;
         }
-
-        data_index++;
     }
     if (result == -1) {
         goto error;

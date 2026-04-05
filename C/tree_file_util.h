@@ -10,6 +10,11 @@ typedef struct {
     size_t length;
 } FixedSizeTrie;
 
+typedef struct {
+    long key;
+    uint64_t address;
+} TrieChildKeyAddressPair;
+
 // Utility methods for acting on FixedSizeTree
 
 size_t get_depth(const char* node);
@@ -22,7 +27,13 @@ uint64_t get_down_count(const char* node);
 
 uint64_t get_number_of_children(const char* node);
 
-char* get_child_with_key(char* root, const char* node, long child_key);
+char* get_child_with_key(
+    char* root,
+    const char* node,
+    long child_key
+);
+
+TrieChildKeyAddressPair* get_child_keys(const char* trie);
 
 void get_prediction(
     const FixedSizeTrie* trie,
@@ -36,7 +47,7 @@ void get_prediction(
 
 bool save_yearly_tries();
 
-void export_trie_to_file(const SequenceCountingTrie* trie, FILE* output_file);
+void export_trie_to_file(SequenceCountingTrie* trie, FILE* output_file);
 
 FixedSizeTrie read_fixed_size_trie_from_file(const char* filename);
 

@@ -1,14 +1,14 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#include <stdint.h>
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
 
-// Debugging is easier when this is false
-#define IS_PARALLEL true
+#include <stdint.h>
 
 // This number must be updated when the dataset is updated
 // IBM has been the largest
-#define LARGEST_STOCK_DATASET_SIZE 15844
+#define LARGEST_STOCK_DATASET_SIZE 15958
 
 // max = 11356
 #define NUMBER_OF_STOCK_EXAMPLES 11356
@@ -28,12 +28,14 @@ static_assert(
 #define BUY_SELL_LAG 5
 
 // The depth of the prediction trees
-#define MAX_TRIE_DEPTH 100
+#define MAX_TRIE_DEPTH 12
 
 // The first year that has any stock data
 #define START_YEAR 1965
 // The year after the last year that has data
 #define END_YEAR 2026
+
+#define NUMBER_OF_YEARS (END_YEAR - START_YEAR + 1)
 
 // How certain the tree should be before its predictions are acted on
 #define PREDICTION_THRESHOLD 0.5

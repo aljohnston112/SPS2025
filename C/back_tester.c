@@ -11,7 +11,7 @@
 #include "tree_file_util.h"
 
 #define MIN_DEPTH  1
-#define MAX_DEPTH  4
+#define MAX_DEPTH  12
 #define NUM_YEARS  (END_YEAR - START_YEAR + 1)
 #define NUM_DEPTHS (MAX_DEPTH - MIN_DEPTH + 1)
 
@@ -64,38 +64,7 @@ bool get_all_fixed_size_tries(FixedSizeTrie trees[NUM_YEARS][NUM_DEPTHS]) {
     return true;
 }
 
-bool run_fast_backtest_with_past_stock_data(
-    const StockDataTables* past_stock_data_tables
-) {
-    // all_stock_ranks must be freed
-    // -------------------------------------------------------------------------
-    SymbolToRanksHashMap* all_stock_ranks =
-        malloc(sizeof(SymbolToRanksHashMap));
-    if (all_stock_ranks == NULL) {
-        perror("malloc failed");
-        return false;
-    }
-    all_stock_ranks->count = 0;
-    if (!initialize_symbol_to_ranks_hash_map(
-            past_stock_data_tables,
-            all_stock_ranks
-        )
-    ) {
-        free(all_stock_ranks);
-        return false;
-    }
-
-    if (!rank_stocks_by_low(
-            past_stock_data_tables,
-            all_stock_ranks,
-            DAYS_PER_DIFF,
-            BUY_SELL_LAG
-        )
-    ) {
-        free_symbol_to_ranks_hash_map(all_stock_ranks);
-        return false;
-    }
-
+bool run_fast_backtest_loop(SymbolToRanksHashMap* all_stock_ranks) {
     FixedSizeTrie trees[NUM_YEARS][NUM_DEPTHS] = {NULL};
     if (!get_all_fixed_size_tries(trees)) {
         free_symbol_to_ranks_hash_map(all_stock_ranks);
@@ -185,6 +154,7 @@ bool run_fast_backtest_with_past_stock_data(
                 // Go through every day in the data minus room to check for a sale
 
                 // Bail out if we decided to bail earlier
+                // A stock is bailed if it did not follow the up pattern and lead to a loss
                 if (bailed[j] && bail_days[j] != 0 &&
                     bail_days[j] <= current_day
                 ) {
@@ -231,12 +201,12 @@ bool run_fast_backtest_with_past_stock_data(
                         printf(
                             "Trade %zu after %lu days: "
                             "Buy at %.2f, Sell at %.2f, "
-                            "Total Capital: %.2f \n",
+                            "Total Assets: %.2f \n",
                             total_trades,
                             open_trade.sell_day - open_trade.buy_day,
                             open_trade.buy_price,
                             sell_price,
-                            capital
+                            capital + money_currently_in_held_stocks
                         );
                     }
                 }
@@ -250,43 +220,46 @@ bool run_fast_backtest_with_past_stock_data(
                     free(bailed);
                     free(bail_days);
                     fprintf(stderr, "Too many open trades!\n");
-                    return false;
+                    return future_stock_ranks;
+                }
+
+                if (future_stock_ranks->dates[current_day]->year < 2000) {
+                    continue;
                 }
 
                 const uint16_t year_limit =
                     future_stock_ranks->dates[current_day]->year - 1;
                 double prediction = 0.0;
-// #pragma omp parallel for collapse(2) reduction(+:prediction)
+                // #pragma omp parallel for collapse(2) reduction(+:prediction)
                 for (uint16_t year = START_YEAR;
                      year < year_limit;
                      year++
                 ) {
-                    for (size_t depth = MIN_DEPTH; depth < MAX_DEPTH; depth++) {
-                        FixedSizeTrie trie =
-                            trees[year - START_YEAR][depth - MIN_DEPTH];
-                        if (!trie.start) {
-                            continue;
-                        }
-
-                        // Get that data and ask the trie whether it thinks we should buy
-                        const size_t sequence_length = current_day < depth
-                                ? current_day
-                                : depth;
-                        const long* past_sequence =
-                            &future_stock_ranks->rank_diffs[
-                                current_day - sequence_length
-                            ];
-                        size_t depth_found = 0;
-                        double prediction_found = 0.0;
-                        get_prediction(
-                            &trie,
-                            past_sequence,
-                            sequence_length,
-                            &prediction_found,
-                            &depth_found
-                        );
-                        prediction += prediction_found;
+                    constexpr uint64_t depth = MAX_TRIE_DEPTH;
+                    FixedSizeTrie trie =
+                        trees[year - START_YEAR][depth - MIN_DEPTH];
+                    if (!trie.start) {
+                        continue;
                     }
+
+                    // Get that data and ask the trie whether it thinks we should buy
+                    const size_t sequence_length = current_day < depth
+                                                       ? current_day
+                                                       : depth;
+                    const long* past_sequence =
+                        &future_stock_ranks->rank_diffs[
+                            current_day - sequence_length
+                        ];
+                    size_t depth_found = 0;
+                    double prediction_found = 0.0;
+                    get_prediction(
+                        &trie,
+                        past_sequence,
+                        sequence_length,
+                        &prediction_found,
+                        &depth_found
+                    );
+                    prediction += prediction_found;
                 }
 
                 // If the tree says we should buy and there is room to sell
@@ -294,68 +267,38 @@ bool run_fast_backtest_with_past_stock_data(
                     // Only consider stocks under some price
                     const double buy_price =
                         future_stock_ranks->high_per_day[current_day + 1];
-                    if (buy_price < 1) {
-                        // Assume default sell date
-                        uint64_t sell_day = 1 + current_day + BUY_SELL_LAG;
-                        double sell_price = -1.0;
+                    // Assume default sell date
+                    const uint64_t sell_day = 1 + current_day + BUY_SELL_LAG;
+                    const double sell_price =
+                        future_stock_ranks->low_per_day[sell_day];
 
-                        // But see if we can sell earlier for profit,
-                        // hold until profit,
-                        // or wait til the stock reaches last stock day
-                        for (size_t day = current_day + 2;
-                             day < future_stock_ranks->size;
-                             day++
-                        ) {
-                            if (future_stock_ranks->low_per_day[day] >=
-                                buy_price * 2
-                            ) {
-                                sell_price =
-                                    future_stock_ranks->low_per_day[day];
-                                sell_day = day;
-                                break;
-                            }
-                        }
+                    // For tracking how many trades were a profit
+                    if (sell_price > buy_price) {
+                        n_profit++;
+                    }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wfloat-equal"
-                        if (sell_price == -1.0) {
-#pragma GCC diagnostic pop
-                            sell_price = future_stock_ranks->low_per_day[
-                                future_stock_ranks->size - 1
-                            ];
-                            sell_day = future_stock_ranks->size - 1;
-                        }
+                    // Take a portion of the current capital and
+                    // use it to buy the stock
+                    const double spent = capital * 0.1;
+                    open_trades[num_open_trades++] = (OpenTrade){
+                        .buy_price = buy_price,
+                        .buy_day = current_day + 1,
+                        .sell_day = sell_day,
+                        .shares = spent / buy_price,
+                        .sell_price = sell_price
+                    };
+                    capital -= spent;
+                    money_currently_in_held_stocks += spent;
 
-                        // For tracking how many trades were a profit
-                        if (sell_price > buy_price) {
-                            n_profit++;
-                        }
-
-                        // Take a portion of the current capital and
-                        // use it to buy the stock
-                        const double spent = capital * 0.1;
-                        open_trades[num_open_trades++] = (OpenTrade){
-                            .buy_price = buy_price,
-                            .buy_day = current_day + 1,
-                            .sell_day = sell_day,
-                            .shares = spent / buy_price,
-                            .sell_price = sell_price
-                        };
-                        capital -= spent;
-                        money_currently_in_held_stocks += spent;
-
-                        // If the trade resulted in a loss, do not consider it again
-                        if (sell_price < buy_price && !bailed[j]) {
-                            printf(
-                                "%s\n",
-                                future_stock_ranks->stock_symbol
-                                //"Bailing on stock: %s after selling for %.2f\n",
-                                // stock_ranks->stock_symbol,
-                                // (sell_price / buy_price)
-                            );
-                            bail_days[j] = sell_day;
-                            bailed[j] = true;
-                        }
+                    // If the trade resulted in a loss, do not consider it again
+                    if (sell_price < buy_price && !bailed[j]) {
+                        printf(
+                            "Bailing on stock: %s after loss of %.2f%%\n",
+                            future_stock_ranks->stock_symbol,
+                            (1 -((sell_price / buy_price))) * 100
+                        );
+                        bail_days[j] = sell_day;
+                        bailed[j] = true;
                     }
                 }
             }
@@ -409,6 +352,44 @@ bool run_fast_backtest_with_past_stock_data(
     // open_trades freed
     // -------------------------------------------------------------------------
     free(open_trades);
+    return total_trades;
+}
+
+bool run_fast_backtest_with_past_stock_data(
+    const StockDataTables* past_stock_data_tables
+) {
+    // all_stock_ranks must be freed
+    // -------------------------------------------------------------------------
+    SymbolToRanksHashMap* all_stock_ranks =
+        malloc(sizeof(SymbolToRanksHashMap));
+    if (all_stock_ranks == NULL) {
+        perror("malloc failed");
+        return false;
+    }
+    all_stock_ranks->count = 0;
+    if (!initialize_symbol_to_ranks_hash_map(
+            past_stock_data_tables,
+            all_stock_ranks
+        )
+    ) {
+        free(all_stock_ranks);
+        return false;
+    }
+
+    if (!rank_stocks_by_low(
+            past_stock_data_tables,
+            all_stock_ranks,
+            DAYS_PER_DIFF,
+            BUY_SELL_LAG
+        )
+    ) {
+        free_symbol_to_ranks_hash_map(all_stock_ranks);
+        return false;
+    }
+
+    if (!run_fast_backtest_loop(all_stock_ranks)) {
+        return false;
+    }
 
     // all_stock_ranks freed
     // -------------------------------------------------------------------------

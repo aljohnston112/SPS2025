@@ -1,10 +1,12 @@
 #include "tree_file_util.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <asm-generic/errno-base.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 
@@ -116,7 +118,11 @@ uint64_t get_number_of_children(const char* node) {
  *         null if node does not have a child with the given key.
  */
 __attribute__((pure))
-char* get_child_with_key(char* root, const char* node, const long child_key) {
+char* get_child_with_key(
+    char* root,
+    const char* node,
+    const long child_key
+) {
     const uint64_t number_of_children = get_number_of_children(node);
     const char* start_offset = node + child_list_offset;
     for (uint64_t child_index = 0;
@@ -142,6 +148,37 @@ char* get_child_with_key(char* root, const char* node, const long child_key) {
         }
     }
     return nullptr;
+}
+
+TrieChildKeyAddressPair* get_child_keys(const char* trie) {
+    const uint64_t number_of_children = get_number_of_children(trie);
+    TrieChildKeyAddressPair* child_keys =
+        malloc(sizeof(TrieChildKeyAddressPair) * number_of_children);
+    if (child_keys == nullptr) {
+        fprintf(stdout, "Failed to allocate for child keys");
+        return nullptr;
+    }
+
+    const char* start_offset = trie + child_list_offset;
+    for (uint64_t child_index = 0;
+         child_index < number_of_children;
+         child_index++
+    ) {
+        TrieChildKeyAddressPair* key_address_pair = &child_keys[child_index];
+        const char* key_address =
+            start_offset + (child_index * child_entry_size);
+        memcpy(
+            &key_address_pair->key,
+            key_address,
+            key_size
+        );
+        memcpy(
+            &key_address_pair->address,
+            key_address + sizeof(long),
+            child_offset_size
+        );
+    }
+    return child_keys;
 }
 
 void get_prediction_helper(
@@ -245,7 +282,7 @@ void ensure_buffer_capacity(
     const size_t needed
 ) {
     if (needed > buffer->capacity) {
-        size_t new_capacity = buffer->capacity ? buffer->capacity : 128;
+        size_t new_capacity = buffer->capacity != 0 ? buffer->capacity : 128;
         while (new_capacity < needed) {
             new_capacity *= 2;
         }
@@ -312,20 +349,31 @@ void add_to_node_list(
  * @param trie The trie to get a flattened version of.
  * @param depth The depth of the given trie.
  * @param list The node list to add to.
+ * @param serialization_index The index in list that
+ *                            the next node will be written to.
+ * @return The index at which the next node can be placed in list.
  */
-void get_node_list_of_trie(
-    const SequenceCountingTrie* trie,
+size_t get_node_list_of_trie(
+    SequenceCountingTrie* trie,
     const size_t depth,
-    NodeList* list
+    NodeList* list,
+    size_t serialization_index
 ) {
+    trie->serialization_index = serialization_index++;
     add_to_node_list(list, trie, depth);
 
     for (size_t i = 0; i < trie->capacity; ++i) {
-        const SequenceCountingTrie* child = trie->map[i];
+        SequenceCountingTrie* child = trie->map[i];
         if (child) {
-            get_node_list_of_trie(child, depth + 1, list);
+            serialization_index = get_node_list_of_trie(
+                child,
+                depth + 1,
+                list,
+                serialization_index
+            );
         }
     }
+    return serialization_index;
 }
 
 /**
@@ -346,10 +394,9 @@ bool save_yearly_tries() {
     past_stock_data_tables->table_count = 0;
     past_stock_data_tables->table_count = 0;
 
-    // first year is 1965
-    u_int16_t start_year = 1965;
+    u_int16_t start_year = START_YEAR;
     uint16_t end_year = start_year + 1;
-    while (start_year < 2025) {
+    while (start_year < END_YEAR) {
         start_year++;
         end_year++;
 
@@ -402,6 +449,7 @@ bool save_yearly_tries() {
             return false;
         }
 
+
         if (!rank_stocks_by_low(
                 past_stock_data_tables,
                 past_symbol_to_ranks_map,
@@ -430,14 +478,16 @@ bool save_yearly_tries() {
             MAX_TRIE_DEPTH
         );
 
-        FILE* fd = fopen(filename, "w");
+        FILE* fd = fopen(filename, "wbx");
         free(filename);
         if (fd == NULL) {
-            perror("fopen failed");
-            free_trie(trie);
-            free_stock_data_tables(past_stock_data_tables);
-            free_symbol_to_ranks_hash_map(past_symbol_to_ranks_map);
-            return false;
+            if (errno != EEXIST) {
+                perror("fopen failed");
+                free_trie(trie);
+                free_stock_data_tables(past_stock_data_tables);
+                free_symbol_to_ranks_hash_map(past_symbol_to_ranks_map);
+                return false;
+            }
         }
         export_trie_to_file(trie, fd);
         fclose(fd);
@@ -492,7 +542,7 @@ bool save_yearly_tries() {
  * @param trie The trie to write to file.
  * @param output_file The file to output the tree.
  */
-void export_trie_to_file(const SequenceCountingTrie* trie, FILE* output_file) {
+void export_trie_to_file(SequenceCountingTrie* trie, FILE* output_file) {
     assert(trie);
     assert(output_file);
     check_little_endian();
@@ -510,7 +560,7 @@ void export_trie_to_file(const SequenceCountingTrie* trie, FILE* output_file) {
         exit(EXIT_FAILURE);
     }
 
-    get_node_list_of_trie(trie, 0, &node_list);
+    get_node_list_of_trie(trie, 0, &node_list, 0);
 
     // Write nodes
     // 40 bytes per node is a vast underestimate
@@ -571,28 +621,23 @@ void export_trie_to_file(const SequenceCountingTrie* trie, FILE* output_file) {
         for (size_t j = 0; j < node->capacity; ++j) {
             const SequenceCountingTrie* child = node->map[j];
             if (child) {
-                for (size_t k = 0; k < node_list.count; ++k) {
-                    if (node_list.nodes[k] == child) {
-                        ensure_buffer_capacity(
-                            &buffer,
-                            current_offset + child_entry_size
-                        );
-                        memcpy(
-                            &buffer.data[current_offset],
-                            &child->key,
-                            key_size
-                        );
-                        current_offset += key_size;
-                        memcpy(
-                            &buffer.data[current_offset],
-                            &k,
-                            child_offset_size
-                        );
-                        current_offset += child_offset_size;
-                        buffer.size = current_offset;
-                        break;
-                    }
-                }
+                ensure_buffer_capacity(
+                    &buffer,
+                    current_offset + child_entry_size
+                );
+                memcpy(
+                    &buffer.data[current_offset],
+                    &child->key,
+                    key_size
+                );
+                current_offset += key_size;
+                memcpy(
+                    &buffer.data[current_offset],
+                    &child->serialization_index,
+                    child_offset_size
+                );
+                current_offset += child_offset_size;
+                buffer.size = current_offset;
             }
         }
     }
@@ -613,7 +658,6 @@ void export_trie_to_file(const SequenceCountingTrie* trie, FILE* output_file) {
                 &buffer.data[current_offset],
                 child_offset_size
             );
-
             memcpy(
                 &buffer.data[current_offset],
                 &offsets[child_index],
@@ -700,7 +744,7 @@ FixedSizeTrie load_trie_from_year(const uint16_t year) {
     for (size_t i = 0; i < file_data.file_count; i++) {
         const char* file_path = file_data.file_paths[i];
         const char* lastSlashPosition = strrchr(file_path, '/');
-        if(lastSlashPosition == NULL) {
+        if (lastSlashPosition == NULL) {
             free_all_files_paths(&file_data);
             exit(EXIT_FAILURE);
         }

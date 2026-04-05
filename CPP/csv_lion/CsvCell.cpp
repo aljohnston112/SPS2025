@@ -33,7 +33,10 @@ char* csv_cell_as_str(const CsvCell* self) {
  *         ERANGE if the integer was out of range
  *         EINVAL if no conversion was performed
  */
-int csv_cell_as_double(const CsvCell* self, double* out_value) {
+ int csv_cell_as_double(
+    const CsvCell* self,
+    double* out_value
+) {
     const auto [_, ec] = std::from_chars(
         self->ptr,
         self->ptr + self->size,

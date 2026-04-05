@@ -1,6 +1,5 @@
 #include "ranks.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -51,9 +50,9 @@ bool rank_stocks_by_low(
 
     // stock_tables needs to be freed
     // -------------------------------------------------------------------------
-    StockDataTable** stock_tables =
+    StockDataTable** valid_stock_tables =
         malloc(sizeof(StockDataTable*) * number_of_stocks);
-    if (stock_tables == NULL) {
+    if (valid_stock_tables == NULL) {
         fprintf(
             stderr,
             "Failed to allocate memory for inactive_stock_tables"
@@ -65,17 +64,17 @@ bool rank_stocks_by_low(
     for (size_t i = 0; i < number_of_stocks; i++) {
         StockDataTable* table = &stock_data_tables->tables[i];
         if (table->row_count > days_per_diff) {
-            stock_tables[valid_count++] = table;
+            valid_stock_tables[valid_count++] = table;
         }
     }
 
     if (!rank_valid_stocks_by_low(
             all_stock_ranks,
-            stock_tables,
+            valid_stock_tables,
             valid_count
         )
     ) {
-        free(stock_tables);
+        free(valid_stock_tables);
         return false;
     }
 
@@ -87,7 +86,7 @@ bool rank_stocks_by_low(
 
     // stock_tables needs to be freed
     // -------------------------------------------------------------------------
-    free(stock_tables);
+    free(valid_stock_tables);
 
     return true;
 }

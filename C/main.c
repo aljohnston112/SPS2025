@@ -18,11 +18,12 @@ void printOpenMPVersion() {
 #endif
 
 bool process(void) {
-    return prepare_data_and_run_back_test();
+    // return prepare_data_and_run_back_test();
     // return process_and_print_promising_stocks();
     // print_bounds_on_tries();
     // FixedSizeTrie map = load_trie_from_year(1965);
-    // return run_fast_backtest();
+    //save_yearly_tries();
+    return run_fast_backtest();
     return true;
 }
 

@@ -45,7 +45,7 @@ bool get_all_file_paths_recursive_helper(
             perror("Failed to get file path\n");
             file_path_list->file_count = 0;
             for (size_t i = 0; i < file_path_list->file_count; i++) {
-                free((void *)(uintptr_t)file_path_list->file_paths[i]);
+                free((void*)(uintptr_t)file_path_list->file_paths[i]);
             }
             return false;
         }
@@ -79,7 +79,7 @@ bool get_all_file_paths_recursive_helper(
                 free(full_path);
                 closedir(sub_dir);
                 for (size_t i = 0; i < file_path_list->file_count; i++) {
-                    free((void *)(uintptr_t)file_path_list->file_paths[i]);
+                    free((void*)(uintptr_t)file_path_list->file_paths[i]);
                 }
                 file_path_list->file_count = 0;
                 return false;;
@@ -291,7 +291,7 @@ __attribute__((noreturn)) void* load_stock_data_thread_routine(void* args_in) {
     pthread_exit(&args->success);
 }
 
-bool old_read_csv(
+bool single_threaded_read_csv(
     const FilePathList* file_path_list,
     StockDataTables* stock_data_tables,
     const uint16_t* start_year,
@@ -355,7 +355,21 @@ bool load_stock_data_from_files(
     }
 
 #ifdef PARALLEL
-        constexpr uint8_t number_of_threads = 6;
+    constexpr uint8_t number_of_threads = 12;
+    const size_t chunk_size = file_path_list->file_count / number_of_threads;
+    if (chunk_size == 0) {
+        if (!single_threaded_read_csv(
+                file_path_list,
+                stock_data_tables,
+                start_year,
+                end_year,
+                file_count
+            )
+        ) {
+            free_stock_data_tables(stock_data_tables);
+            return false;
+        }
+    } else {
         pthread_t* threads = malloc(number_of_threads * sizeof(pthread_t));
         if (threads == nullptr) {
             perror("Failed to allocate threads");
@@ -372,65 +386,63 @@ bool load_stock_data_from_files(
             free(threads);
             return false;
         }
-
-    const size_t chunk_size = file_path_list->file_count / number_of_threads;
-    for (uint8_t i = 0; i < number_of_threads; i++) {
-        thread_args[i] = (load_stock_data_thread_metadata){
-            .file_paths = file_path_list->file_paths,
-            .tables = stock_data_tables->tables,
-            .start_i = i * chunk_size,
-            .end_i = (i == number_of_threads - 1)
-                         ? file_path_list->file_count
-                         : (i + 1) * chunk_size - 1,
-            .start_year = start_year,
-            .end_year = end_year,
-            .success = false
-        };
-        if (pthread_create(
-                &threads[i],
-                NULL,
-                load_stock_data_thread_routine,
-                &thread_args[i]
-            ) != 0
-        ) {
-            perror("Failed to create thread");
-            free_stock_data_tables(stock_data_tables);
-            free(threads);
-            free(thread_args);
-            return false;
+        for (uint8_t i = 0; i < number_of_threads; i++) {
+            thread_args[i] = (load_stock_data_thread_metadata){
+                .file_paths = file_path_list->file_paths,
+                .tables = stock_data_tables->tables,
+                .start_i = i * chunk_size,
+                .end_i = (i == number_of_threads - 1)
+                             ? file_path_list->file_count
+                             : (i + 1) * chunk_size - 1,
+                .start_year = start_year,
+                .end_year = end_year,
+                .success = false
+            };
+            if (pthread_create(
+                    &threads[i],
+                    NULL,
+                    load_stock_data_thread_routine,
+                    &thread_args[i]
+                ) != 0
+            ) {
+                perror("Failed to create thread");
+                free_stock_data_tables(stock_data_tables);
+                free(threads);
+                free(thread_args);
+                return false;
+            }
         }
-    }
 
-    for (uint8_t i = 0; i < number_of_threads; i++) {
-        if (pthread_join(threads[i], NULL) != 0) {
-            perror("Failed to join thread");
-            free_stock_data_tables(stock_data_tables);
-            free(threads);
-            free(thread_args);
-            return false;
-        }
-        if (!thread_args[i].success) {
-            perror("thread failed");
-            free_stock_data_tables(stock_data_tables);
-            free(threads);
-            free(thread_args);
-            return false;
+        for (uint8_t i = 0; i < number_of_threads; i++) {
+            if (pthread_join(threads[i], NULL) != 0) {
+                perror("Failed to join thread");
+                free_stock_data_tables(stock_data_tables);
+                free(threads);
+                free(thread_args);
+                return false;
+            }
+            if (!thread_args[i].success) {
+                perror("thread failed");
+                free_stock_data_tables(stock_data_tables);
+                free(threads);
+                free(thread_args);
+                return false;
+            }
         }
     }
 #else
-    if (!old_read_csv(
-        file_path_list,
-        stock_data_tables,
-        start_year,
-        end_year,
-        file_count
-    )
+    if (!single_threaded_read_csv(
+            file_path_list,
+            stock_data_tables,
+            start_year,
+            end_year,
+            file_count
+        )
     ) {
         free_stock_data_tables(stock_data_tables);
         return false;
     }
 #endif
-
 
 
     // Free the zero sized tables and shift the remaining ones over
@@ -439,7 +451,7 @@ bool load_stock_data_from_files(
     for (size_t read_index = 0; read_index < old_table_count; read_index++) {
         StockDataTable* table = &stock_data_tables->tables[read_index];
         if (table->row_count == 0) {
-            free((void *)(uintptr_t)table->stock_symbol);
+            free((void*)(uintptr_t)table->stock_symbol);
             free(table->rows);
             continue;
         }
@@ -462,7 +474,7 @@ bool load_stock_data_from_files(
  */
 void free_all_files_paths(FilePathList* file_path_list) {
     for (size_t i = 0; i < file_path_list->file_count; i++) {
-        free((void *)(uintptr_t)file_path_list->file_paths[i]);
+        free((void*)(uintptr_t)file_path_list->file_paths[i]);
     }
     free(file_path_list->file_paths);
     file_path_list->file_count = 0;
@@ -481,7 +493,7 @@ void free_stock_data_tables(StockDataTables* stock_data_tables) {
         i++
     ) {
         free(stock_data_tables->tables[i].rows);
-        free((void *)(uintptr_t)stock_data_tables->tables[i].stock_symbol);
+        free((void*)(uintptr_t)stock_data_tables->tables[i].stock_symbol);
     }
     free(stock_data_tables->tables);
     free(stock_data_tables);

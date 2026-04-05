@@ -144,22 +144,23 @@ int csv_reader_try_parse(CsvReader* reader) {
             cell = &reader->cursor.cells[++reader->cursor.count];
             last_index = index;
         }
+        last_index += 64;
     }
 
     const __m512i new_line = _mm512_set1_epi8('\n');
     chunk = _mm512_loadu_si512((__m512i*)start_ptr);
     mask = _mm512_cmpeq_epu8_mask(chunk, new_line);
+    uint64_t index = _tzcnt_u64(mask);
     if (mask == 0) {
         chunk = _mm512_loadu_si512((__m512i*)(start_ptr + 64));
         mask = _mm512_cmpeq_epu8_mask(chunk, new_line);
+        index = _tzcnt_u64(mask) + 64;
     }
     if (mask == 0) {
         return -1;
     }
 
-    const uint64_t index = _tzcnt_u64(mask);
-    cell->ptr = start_ptr + (overrun ? last_index + 64 : last_index_of_first) +
-        1;
+    cell->ptr = start_ptr + (overrun ? last_index : last_index_of_first) + 1;
     cell->size = index - last_index - 2;
     ++reader->cursor.count;
     reader->ptr = cell->ptr + cell->size + 2;

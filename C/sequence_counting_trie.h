@@ -21,6 +21,7 @@ struct SequenceCountTrie {
     long key;
     uint64_t count_up;
     uint64_t count_down;
+    size_t serialization_index;
 };
 
 SequenceCountingTrie* create_sequence_counting_trie(long key);

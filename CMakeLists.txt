@@ -73,7 +73,6 @@ if (USE_GCC)
             --param=analyzer-max-svalue-depth=50
             -mtune=native
             -flto
-            #-O3
     )
 else ()
     set(CMAKE_C_COMPILER "clang")
@@ -92,34 +91,39 @@ else ()
     )
 endif ()
 
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3")
+
 set(COMMON_LINK_FLAGS
 
 )
 
 set(ENABLE_COVERAGE false)
-if (ENABLE_COVERAGE)
-    list(APPEND COMMON_COMPILE_FLAGS --coverage)
+set(ENABLE_TEST_COVERAGE false)
+if (ENABLE_COVERAGE OR ENABLE_TEST_COVERAGE)
+    list(APPEND COMMON_COMPILE_FLAGS --coverage -Og)
 endif ()
 
 project(SPS2025 C CXX)
 
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(USE_ASAN FALSE)
-set(PARALLEL FALSE)
+set(USE_ASAN false)
+set(PARALLEL true)
+if (PARALLEL)
+    add_definitions(-DPARALLEL)
+endif()
 
 set(
         CXX_SOURCE_FILES
         CPP/csv_lion/CsvCell.cpp
-        CPP/grapher.cpp
 )
 
 set(
         CXX_HEADER_FILES
         CPP/csv_lion/CsvCell.h
-        CPP/grapher.h
-        CPP/matplotlibcpp.h
 )
 
 set(
@@ -194,14 +198,12 @@ target_include_directories(
         ${Python3_NumPy_INCLUDE_DIRS}
 )
 
+set_target_properties(SPS2025 PROPERTIES INTERPROCEDURAL_OPTIMIZATION TRUE)
+
 if (PARALLEL)
     target_link_libraries(SPS2025 PRIVATE m OpenMP::OpenMP_C)
 endif ()
 target_link_libraries(SPS2025 PRIVATE ${Python3_LIBRARIES})
-
-if (ENABLE_COVERAGE)
-    target_link_libraries(SPS2025 PRIVATE gcov)
-endif ()
 
 set(
         C_TEST_HEADER_FILES
@@ -221,7 +223,19 @@ set(
         C_tests/ranks_test.c
         C_tests/sequence_counting_trie_test.c
         C_tests/tree_file_util_test.c
+        C/trie_printer.c
 )
+
+add_executable(
+        TRIE_PRINTER
+        ${C_HEADER_FILES}
+        ${CXX_HEADER_FILES}
+        ${C_SOURCE_FILES}
+        ${CXX_SOURCE_FILES}
+        C/trie_printer.c
+
+)
+set_target_properties(TRIE_PRINTER PROPERTIES LINKER_LANGUAGE C)
 
 add_executable(
         SPS2025Test
@@ -249,7 +263,7 @@ file(COPY C_tests/test_data DESTINATION ${CMAKE_BINARY_DIR})
 file(COPY C_tests/test_empty DESTINATION ${CMAKE_BINARY_DIR})
 
 if (ENABLE_COVERAGE)
-    target_link_libraries(SPS2025Test PRIVATE gcov)
+    target_link_libraries(SPS2025 PRIVATE gcov)
 
     find_program(LCOV_EXEC lcov)
     find_program(GENHTML_EXEC genhtml)
@@ -263,6 +277,32 @@ if (ENABLE_COVERAGE)
     add_custom_target(
             coverage
             DEPENDS coverage_clean
+            DEPENDS SPS2025
+            COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_BINARY_DIR} ./SPS2025
+            COMMAND ${LCOV_EXEC} --directory ${CMAKE_BINARY_DIR} --capture --output-file coverage.info
+            COMMAND ${LCOV_EXEC} --remove coverage.info '/usr/*' --output-file coverage_filtered.info --ignore-errors unused
+            COMMAND ${GENHTML_EXEC} coverage_filtered.info --output-directory coverage_html
+            COMMAND xdg-open coverage_html/index.html
+            COMMENT "Generating and opening coverage report..."
+    )
+endif ()
+
+if (ENABLE_TEST_COVERAGE)
+    target_link_libraries(SPS2025 PRIVATE gcov)
+    target_link_libraries(SPS2025Test PRIVATE gcov)
+
+    find_program(LCOV_EXEC lcov)
+    find_program(GENHTML_EXEC genhtml)
+
+    add_custom_target(
+            test_coverage_clean
+            COMMAND ${CMAKE_COMMAND} -E remove ${CMAKE_BINARY_DIR}/*.info
+            COMMAND ${CMAKE_COMMAND} -E remove_directory ${CMAKE_BINARY_DIR}/coverage_html
+    )
+
+    add_custom_target(
+            test_coverage
+            DEPENDS coverage_clean
             DEPENDS SPS2025Test
             COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_BINARY_DIR} ./SPS2025Test
             COMMAND ${LCOV_EXEC} --directory ${CMAKE_BINARY_DIR} --capture --output-file coverage.info
@@ -272,5 +312,4 @@ if (ENABLE_COVERAGE)
             COMMENT "Generating and opening coverage report..."
     )
 endif ()
-
 
