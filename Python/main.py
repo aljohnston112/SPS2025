@@ -1,3 +1,5 @@
+import shutil
+
 import numpy as np
 import torch
 import os
@@ -209,17 +211,24 @@ def read_correlation_file_to_map(file_path):
     return correlation_map
 
 def main():
-    print_gpus()
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    # if os.path.exists(HIGH_CORRELATION_FILE_PATH):
-    #     stock_pair_to_correlation_map = read_correlation_file_to_map(HIGH_CORRELATION_FILE_PATH)
-    if os.path.exists(CORRELATION_FILE_PATH):
-        print_correlation_file(CORRELATION_FILE_PATH)
-    else:
-        stock_data_array = load_stock_data_array()
-        raw_stock_data_tensors, direction_data_tensors, direction_counts_tensors = extract_tensors(device, stock_data_array)
-        save_correlations(device, raw_stock_data_tensors)
-    print()
+    RAW_DATA_FOLDER = "/home/alexanderjohnston/CLionProjects/SPS2025/data/raw"
+    INTERMEDIATE_DATA_FOLDER = "/home/alexanderjohnston/CLionProjects/SPS2025/data/intermediate"
+    for root, _, files in os.walk(RAW_DATA_FOLDER):
+        for f in files:
+            src_path = os.path.join(root, f)
+            dst_path = os.path.join(INTERMEDIATE_DATA_FOLDER, f)
+            shutil.copy(src_path, dst_path)
+    # print_gpus()
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    # # if os.path.exists(HIGH_CORRELATION_FILE_PATH):
+    # #     stock_pair_to_correlation_map = read_correlation_file_to_map(HIGH_CORRELATION_FILE_PATH)
+    # if os.path.exists(CORRELATION_FILE_PATH):
+    #     print_correlation_file(CORRELATION_FILE_PATH)
+    # else:
+    #     stock_data_array = load_stock_data_array()
+    #     raw_stock_data_tensors, direction_data_tensors, direction_counts_tensors = extract_tensors(device, stock_data_array)
+    #     save_correlations(device, raw_stock_data_tensors)
+    # print()
 
 
 
