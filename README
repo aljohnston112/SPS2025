@@ -1,16 +1,38 @@
-SPS 2025 stands for the 2025 edition of the Stock Prediction Program.
+# SPS2025 - Data Ingestion & Sequence Modeling Engine
 
-There have been 4 version since 2021,
-and they have provided valuable insights for this iteration of the project.
-The first being that performance is important,
-and most others being related to what kind of ideas do not work.
-Using direction data of price, volume, and date as a predictor has not worked.
-Trees using direction data history to predict were no better than random.
-Creating every permutation of direction sets across all table attributes,
-and then assigning any two to be buy or sell signals also did not work well.
-Plain artificial neural networks and genetic algorithms to choose models
- have been tried in the past,
- but accuracy was not great as there are limits on model size.
+A high-performance data processing pipeline that ingests raw time-series stock data, derives structured features based on stock rank transformations, and builds sequence-based models for analysis.
+
+The system transforms raw market data into rank-based feature streams and constructs sequence-counting structures (implemented as variable-order Markov models (VOMMs), referred to here as sequence counting tries).
+
+## Key Concepts
+
+- High-throughput data ingestion pipeline for stock time-series data
+- Rank-based feature derivation from raw market inputs
+- Construction of sequence-counting trie structures
+- Experimental modeling of temporal dependencies in stock movement sequences
+- Multithreaded + SIMD-optimized processing (AVX-512, pthreads)
+- Test-driven validation of transformation and model consistency
+
+## Components
+
+- **Ingestion layer** – parses raw input data efficiently
+- **Transformation layer** – computes rank-based feature sequences
+- **Model layer** – constructs sequence-counting trie structures (VOMMs)
+- **Testing layer** – verifies correctness of transformations and model outputs
+
+## Tech Stack
+
+- C
+- AVX-512 SIMD intrinsics
+- pthreads (parallel processing)
+
+## Notes
+
+The project began as an exploratory system for analyzing stock data patterns and evolved into a pipeline for building sequence-based probabilistic models over derived event streams.
+
+The “sequence counting trie” structure was independently implemented before learning it corresponds to variable-order Markov models.
+
+## Building
 
 This program only runs under Linux.
 
