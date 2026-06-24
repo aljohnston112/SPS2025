@@ -1,12 +1,12 @@
 # SPS2025 - Data Ingestion & Sequence Modeling Engine
 
-A high-performance data processing pipeline that ingests raw time-series stock data, derives structured features based on stock rank transformations, and builds sequence-based models for analysis.
+A high-performance data processing pipeline that ingests raw time-series stock data using multiple threads, derives structured features based on stock rank transformations, and builds sequence-based models for analysis.
 
 The system transforms raw market data into rank-based feature streams and constructs sequence-counting structures (implemented as variable-order Markov models (VOMMs), referred to here as sequence counting tries).
 
 ## Key Concepts
 
-- High-throughput data ingestion pipeline for stock time-series data
+- Multi-threaded, high-throughput data ingestion pipeline for stock time-series data
 - Rank-based feature derivation from raw market inputs
 - Construction of sequence-counting trie structures
 - Experimental modeling of temporal dependencies in stock movement sequences
